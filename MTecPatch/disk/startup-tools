@@ -1,0 +1,14 @@
+stack 32768
+FailAt 21
+TinySetPatch QUIET
+Assign T: RAM:
+Assign ENV: RAM:
+Assign LOCALE: SYS:Locale
+Assign FONTS: RAM:
+Assign MUI: SYS:
+MTecPatch >NIL:
+MTecTest SCAN >NIL:
+Execute RAM:MountAll >NIL:
+Echo "Type a command and press Return:"
+Echo "  MasterInstall   SCSIBench"
+Echo "  MasterMount     Reboot"

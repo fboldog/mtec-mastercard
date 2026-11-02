@@ -1,0 +1,195 @@
+==== MTecTest run
+Monday 02-Nov-26 18:00:27
+mtecscsi.device version 2.3
+exec.library version 39.47
+MTecPatch 1.3 installed, mtecscsi.device 2.3 is now 2.32
+mtecscsi.device version 2.32
+Requests left to the driver: 0
+32-bit requests at 2 GB+:    0
+TD64 requests:               0
+NSD requests:                0
+NSD device queries:          0
+Geometry requests:           0
+Other added commands:        1
+Sent as READ/WRITE(10):      0
+Sent as CMD_READ/CMD_WRITE:  0
+Retries:                     0
+Failed requests:             0
+Unit: READ CAPACITY failed, error 44, status 0, got 0 bytes
+Unit 1: disk of 7672 MB
+Partition SDH0: 15-3106 MB, dostype 444F5303, cyl 2-395, automount off
+  255 heads, 63 sectors, 1 sectors per block, block 512 bytes, 6329610 sectors total
+  sector +0: id 444F5303
+  sector +1: id 00000000
+  sector +2: id 50465301 options 0000077F disksize 4192965 reserved_blksize 1024
+  sector +4: id FFFFFFFF
+  sector +8: id FFFFFFFF
+  sector +16: id 4D490000
+Partition SDH1: 3106-7200 MB, dostype 50465303, cyl 396-917, automount off
+  255 heads, 63 sectors, 8 sectors per block, block 512 bytes, 8385930 sectors total
+  sector +0: id 00000000
+  sector +1: id 00000000
+  sector +2: id 00000000
+  sector +4: id 50465301
+  sector +8: id 00000000
+  sector +16: id 00000000
+Found 2 partitions
+Unit 1: 7672 MB
+  READ CAPACITY asked 8, reported 8, stored up to byte 8, err 0 ok
+  MODE SENSE    asked 12, reported 12, stored up to byte 12, err 0 ok
+  1 GB   same     SCSI(10) err 0 ok
+  1 GB   same     CMD      err 0 ok
+  1 GB   same     TD64     err 0 ok
+  1 GB   same     NSD      err 0 ok
+  2 GB   same     SCSI(10) err 0 ok
+  2 GB   same     CMD      err 0 ok
+  2 GB   same     TD64     err 0 ok
+  2 GB   same     NSD      err 0 ok
+  3 GB   same     SCSI(10) err 0 ok
+  3 GB   same     CMD      err 0 ok
+  3 GB   same     TD64     err 0 ok
+  3 GB   same     NSD      err 0 ok
+  4 GB   same     SCSI(10) err 0 ok
+  4 GB   same     TD64     err 0 ok
+  4 GB   same     NSD      err 0 ok
+  5 GB   same     SCSI(10) err 0 ok
+  5 GB   same     TD64     err 0 ok
+  5 GB   same     NSD      err 0 ok
+RESULT read test: 0 failures
+RESULT file test SDH0: ok
+SDH1: 8 sectors per block, set
+RESULT file test SDH1: ok
+
+Mounted disks:
+Unit      Size    Used    Free Full Errs   Status   Name
+SDH1:     490M       1  980747   0%   0  Read/Write PFSTest
+SDH0:     3164M    1577 6328031   0%   0  Read/Write FFSTest
+RAM:        7K      15       0 100%   0  Read/Write Ram Disk
+DF0:      880K     568    1190  32%   0  Read/Write MTECTEST
+
+Volumes available:
+PFSTest [Mounted]
+FFSTest [Mounted]
+Ram Disk [Mounted]
+MTECTEST [Mounted]
+Requests left to the driver: 2111
+32-bit requests at 2 GB+:    2
+TD64 requests:               5
+NSD requests:                158
+NSD device queries:          1
+Geometry requests:           0
+Other added commands:        24
+Sent as READ/WRITE(10):      163
+Sent as CMD_READ/CMD_WRITE:  5
+Retries:                     0
+Failed requests:             0
+Test mtecscsi.device 1 with Zorro II RAM
+read  512 KB xfers          6040 KB/sec (19% CPU)
+read  128 KB xfers          5799 KB/sec (7% CPU)
+read   32 KB xfers          4922 KB/sec (2% CPU)
+TD_GETGEOMETRY     Success  15712256 x 512  C=978 H=255 S=63 Type=0
+TD_CHANGENUM       Success  Count=1
+TD_CHANGESTATE     Success  Disk present
+TD_PROTSTATUS      Success  Unprotected
+TD_GETDRIVETYPE    Success  Type=0 Unknown
+TD_GETNUMTRACKS    Success  Tracks=249400
+TD_RAWREAD         Fail -3  IOERR_NOCMD
+CMD_UPDATE         Success
+SCSI command requires at least two arguments (len and cmd)
+SCSICMD Inquiry    Success  V='QUANTUM' P='BlueSCSI Pico' R='1.0' DT=0x0 Linked Sync
+SCSICMD TUR        Success  Ready
+NSCMD_DEVICEQUERY  Success
+CMD_READ           Success
+ETD_READ           Success
+TD_READ64          Success
+NSCMD_TD_READ64    Success
+NSCMD_ETD_READ64   Success
+TD_SEEK            Success
+ETD_SEEK           Success
+TD_SEEK64          Success
+NSCMD_TD_SEEK64    Success
+NSCMD_ETD_SEEK64   Success
+TD_MOTOR ON        Success
+TD_MOTOR OFF       Success
+Change count 1
+ETD_READ                           error 0, want 0: ok
+ETD_READ old count                 error 29, want 29: ok
+NSCMD_ETD_READ64                   error 0, want 0: ok
+NSCMD_ETD_SEEK64                   error 0, want 0: ok
+ETD_SEEK                           error 0, want 0: ok
+ETD_MOTOR                          error 0, want 0: ok
+ETD_UPDATE                         error 0, want 0: ok
+ETD_CLEAR                          error 0, want 0: ok
+TD_EJECT load                      error 0, want 0: ok
+TD_RAWREAD stays unsupported       error -3, want -3: ok
+CMD_STOP                           error 0, want 0: ok
+CMD_START                          error 0, want 0: ok
+read after START                   error 0, want 0: ok
+TD_REMOVE set                      error 0, want 0: ok
+TD_REMOVE NULL                     error 0, want 0: ok
+TD_REMOVE NULL, nothing set        error 0, want 0: ok
+HD_SCSICMD bad, no sense           error 45, want 45: ok
+  scsi_Status 2
+HD_SCSICMD bad, autosense          error 45, want 45: ok
+  scsi_Status 2
+No empty unit to test a selection timeout
+Query lists 0006: ok
+Query lists 0007: ok
+Query lists 0017: ok
+Query lists 8002: ok
+Query lists E000: ok
+Query lists 0016: ok
+RESULT CmdTest: 0 failures
+Unit 1: 7672 MB
+  1 GB   write via CMD err 0
+  1 GB   written  SCSI(10) err 0 ok
+  1 GB   written  CMD      err 0 ok
+  1 GB   written  TD64     err 0 ok
+  1 GB   written  NSD      err 0 ok
+  1 GB   original data restored
+  2 GB   write via CMD err 0
+  2 GB   written  SCSI(10) err 0 ok
+  2 GB   written  CMD      err 0 ok
+  2 GB   written  TD64     err 0 ok
+  2 GB   written  NSD      err 0 ok
+  2 GB   original data restored
+  3 GB   write via CMD err 0
+  3 GB   written  SCSI(10) err 0 ok
+  3 GB   written  CMD      err 0 ok
+  3 GB   written  TD64     err 0 ok
+  3 GB   written  NSD      err 0 ok
+  3 GB   original data restored
+  4 GB   write via TD64 err 0
+  4 GB   written  SCSI(10) err 0 ok
+  4 GB   written  TD64     err 0 ok
+  4 GB   written  NSD      err 0 ok
+  4 GB   original data restored
+  5 GB   write via NSD err 0
+  5 GB   written  SCSI(10) err 0 ok
+  5 GB   written  TD64     err 0 ok
+  5 GB   written  NSD      err 0 ok
+  5 GB   original data restored
+RESULT write test: 0 failures
+Requests left to the driver: 2255
+32-bit requests at 2 GB+:    8
+TD64 requests:               14
+NSD requests:                167
+NSD device queries:          3
+Geometry requests:           2
+Other added commands:        45
+Sent as READ/WRITE(10):      182
+Sent as CMD_READ/CMD_WRITE:  17
+Retries:                     0
+Failed requests:             5
+                 SSize TotalSectors    Cyl Head  Sect DType Removable
+TD_GETGEOMETRY     512     15712256    978  255    63  0x00 No
+Inquiry                                                0x00 No
+READ_CAPACITY_10   512     15712256
+READ_CAPACITY_16   512     15712256
+Read-to capacity   512     15712256
+Mode Page 0x03     512                             56
+Mode Page 0x04                       17536   16
+Mode Page 0x0c len=22
+Mode Page 0x31 len=42
+  1 QUANTUM  BlueSCSI Pico    1.0  Disk     512  8044 MB
+==== MTecTest finished

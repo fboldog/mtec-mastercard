@@ -1,0 +1,24 @@
+FailAt 21
+Assign T: RAM:
+Stack 16384
+Echo "MTec sync SCSI read test. Reads only, nothing on the card is written."
+Echo "==== MTecSync run" >>SYS:mtectest.log
+If NOT EXISTS SYS:mtectest.log
+  Echo "This floppy is write protected. Slide the tab and reboot."
+  Quit 20
+EndIf
+MTecPatch >>SYS:mtectest.log
+Version mtecscsi.device >>SYS:mtectest.log
+Echo "Reading the disk layout"
+Wait 5
+MTecTest SCAN >RAM:step
+Type RAM:step >>SYS:mtectest.log
+Wait 5
+If NOT EXISTS RAM:SyncTest
+  Echo "No usable disk found. See SYS:mtectest.log"
+  Quit 10
+EndIf
+Execute RAM:SyncTest
+Echo "==== MTecSync finished" >>SYS:mtectest.log
+Echo "Finished. Reboot, then send the log."
+More SYS:mtectest.log

@@ -1,0 +1,26 @@
+# Copyrighted or personal data: M-Tec disks and ROM, FFS, MUI, OS libraries.
+*.adf
+*.dms
+*.hdf
+*.bin
+*.rom
+*.lha
+InstallDisk3.02/
+InstallDisk3.02.*
+Turbo-Test/
+Turbo-Test.*
+MTecDump/emu/
+
+# Build output
+MTecDump/MTecDump
+MTecDump/More
+MTecPatch/MTecPatch
+MTecPatch/MTecTest
+MTecPatch/MTecSync
+MTecPatch/CmdTest
+MTecPatch/RawTest
+MTecPatch/Reboot
+**/gen/stubs.h
+
+# Stray copy of a startup script, from a redirect to a file named "-"
+MTecPatch/-

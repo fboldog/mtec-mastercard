@@ -1,0 +1,10 @@
+stack 32768
+FailAt 21
+TinySetPatch QUIET
+Assign T: RAM:
+MTecPatch >NIL:
+MTecTest SCAN >NIL:
+Execute RAM:MountAll >NIL:
+xSysInfoLoader START
+xSysInfo SCSI
+xSysInfoLoader STOP

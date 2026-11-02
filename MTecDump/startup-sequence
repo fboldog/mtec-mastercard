@@ -1,0 +1,7 @@
+Echo "MTecDump disk. This floppy is ready to receive the dump."
+Echo ""
+Echo "1. MTecDump >RAM:report.txt"
+Echo "2. More RAM:report.txt"
+Echo "3. Run the MTecDump commands at the end of the report"
+Echo "4. Copy RAM:#? DF0:"
+Echo ""

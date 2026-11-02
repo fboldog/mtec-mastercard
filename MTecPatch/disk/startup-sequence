@@ -1,0 +1,39 @@
+FailAt 21
+Assign T: RAM:
+Stack 16384
+Echo "MTec MasterCard large disk test"
+Echo ""
+Echo "==== MTecTest run" >>SYS:mtectest.log
+If NOT EXISTS SYS:mtectest.log
+  Echo "This floppy is write protected. Slide the tab and reboot."
+  Quit 20
+EndIf
+Date >>SYS:mtectest.log
+Version mtecscsi.device >>SYS:mtectest.log
+Version exec.library >>SYS:mtectest.log
+MTecPatch >>SYS:mtectest.log
+Version mtecscsi.device >>SYS:mtectest.log
+MTecPatch STATUS >>SYS:mtectest.log
+Echo "Reading the disk layout"
+MTecTest SCAN >>SYS:mtectest.log
+If NOT EXISTS RAM:Tests
+  Echo "No usable disk found. See SYS:mtectest.log"
+  Quit 10
+EndIf
+Execute RAM:Tests
+Echo ""
+Echo "Read-only tests and the file test are finished."
+Echo "The raw write test overwrites 128 KB at 1, 2, 3, 4 and 5 GB and"
+Echo "then restores it. A crash or reset during it damages those areas."
+Echo "It also runs the last devtest steps, which can upset memory."
+MTecTest ASK
+If WARN
+  Execute RAM:WriteTest
+Else
+  Echo "Raw write test skipped" >>SYS:mtectest.log
+EndIf
+Echo "==== MTecTest finished" >>SYS:mtectest.log
+Echo "Finished. Reboot before using this Amiga for anything else."
+Echo "The log is SYS:mtectest.log, reading it with More:"
+Echo ""
+More SYS:mtectest.log
