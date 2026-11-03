@@ -32,6 +32,7 @@ Results from this one setup may not apply to other cards or disks.
 | `MTecPatch/Reboot.c` | Reboots the Amiga |
 | `MTecPatch/disk/` | Startup scripts for the floppies |
 | `MTecPatch/*.sh` | Program and floppy image builders |
+| `MTecPatch/mkrom.py`, `mkrom.sh` | Builds a boot ROM with the patch inside |
 | `MTecPatch/logs/` | Logs from real hardware |
 | `MTecPatch/sync_scsi_learning.md` | Why sync SCSI was dropped |
 | `MTecDump/` | ROM and RAM dump tool, plus the small `More` pager |
@@ -56,7 +57,40 @@ Execute RAM:MountAll
 ```
 
 The patch loads after boot, so a partition you boot from is limited by the
-original driver, and everything on it must sit below 2 GB.
+original driver, and everything on it must sit below 2 GB. The ROM version below
+removes that limit.
+
+### Patch in ROM
+
+`mkrom.sh` builds the same `MTecPatch.c` with `ROM_BUILD` and puts it into a copy of
+the card's ROM. The driver then reports itself as `mtecscsi.device` 2.40.
+
+- **Placement:** the patch goes right after the driver, at image `$25E0`. It is
+  3120 bytes, which leaves 3568 bytes of the ROM free.
+- **Loading:** the loader's copy length grows from `$23E0` to `$3010` bytes. The
+  device's init routine becomes the patch's `rom_entry`, which runs the original
+  init and then installs the patch. Six `DiagArea` bytes change; the autoconfig
+  data and the driver stay as they were.
+- **No relocation:** the blob is built PC-relative and keeps its variables in the
+  code. `mkrom.py` refuses a blob with relocations, and an original ROM that
+  differs from the one it was written for.
+- **RAM version:** the RAM `MTecPatch` sees the ROM patch and stays out, so the
+  test floppies still work. `MTecPatch STATUS` shows the ROM patch's counters.
+- **Driver's own requests:** its probes use `HD_SCSICMD` without autosense, so they
+  now get `HFERR_BadStatus` instead of the raw status. The driver only checks those
+  for zero, non-zero and 44, and the patch keeps 44, so its behaviour is unchanged.
+- **Output:** `MTecPatchROM-16k.bin` for Amiberry, and `MTecPatchROM-27C512.bin` to
+  program, with the same layout as the original chip. Neither goes in git,
+  because both contain M-Tec's driver.
+
+Results in Amiberry, with Kickstart 3.1:
+
+| Test | Original ROM | Patched ROM |
+|---|---|---|
+| Boot from an FFS partition at 2.5-3.5 GB | "Not a DOS disk in device DH0" | Boots, 548 reads above 2 GB, file written there matches on the host |
+| `MTecTest.adf` full run | Passes with the RAM patch | Passes: read test, file tests on both partitions, `CmdTest` |
+
+Not tested yet: real hardware, and Kickstart 3.0.
 
 ## What changed in the driver
 
@@ -104,6 +138,7 @@ modern disk has no real geometry. The true size is in `dg_TotalSectors`.
 | 1.1 | 2.3 | `TD_GETGEOMETRY`, `TD_GETNUMTRACKS` |
 | 1.2 | 2.31 | Patched driver marked with its own version and ID string |
 | 1.3 | 2.32 | `TD_EJECT`, `ETD_` commands, `TD_REMOVE` NULL, `HFERR_BadStatus`, expanded NSD list |
+| 1.3 ROM | 2.40 | The same code built into the boot ROM |
 
 ### Fixes along the way
 
@@ -147,7 +182,7 @@ where some failures are deliberate. They haven't been traced one by one.
 - **Real media changes:** `TD_ADDCHANGEINT`, `TD_REMOVE` and the change counter. It
   isn't known whether the driver notices a swap by itself.
 - **Media with sectors other than 512 bytes.**
-- **Booting** with the patch, because it can only load after boot.
+- **The ROM version,** which has only run in Amiberry.
 
 ## Findings
 
@@ -260,6 +295,14 @@ Python 3. Set `NDK` if the headers aren't in `~/amiga/AmigaOS/AmigaOS3.2/NDK3.2`
 cd MTecPatch && ./build.sh
 cd ../MTecDump && ./build.sh
 ```
+
+### ROM image
+
+```sh
+cd MTecPatch && ./mkrom.sh ../mastercard-27C512-eprom.rom
+```
+
+It takes the 64 KB chip read or the 16 KB dump, and both give the same result.
 
 ### Floppy images
 

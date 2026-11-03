@@ -16,9 +16,49 @@
  * Also added: TD_EJECT, the ETD_ commands, TD_REMOVE with NULL, which the driver
  * would store and later Cause(), and a proper HFERR_BadStatus for HD_SCSICMD
  * without autosense, where the driver returns the raw SCSI status byte.
+ *
+ * Built with ROM_BUILD, the same code becomes a blob for the card's boot ROM
+ * (see mkrom.py). The blob is copied to RAM right after the driver, without
+ * relocation, so it is built PC-relative and keeps its variables in the code.
+ * The device's init routine points at rom_entry, which runs the driver's own
+ * init and then installs the patch before anything can boot.
  */
+#ifndef ROM_BUILD
 /* AmigaOS enters at the first byte of the first hunk. */
 __asm("  .text\n  jmp _start\n");
+#else
+#define STR_(x) #x
+#define STR(x) STR_(x)
+/* Called as the device's init routine: d0 = device, a0 = segment, a6 = SysBase.
+   ORIG_INIT is the distance from here back to the driver's init routine. */
+__asm(
+"  .text\n"
+"  .globl _rom_entry\n"
+"_rom_entry:\n"
+"  lea _SysBase(pc),a1\n"
+"  move.l a6,(a1)\n"
+"  jsr _rom_entry-" STR(ORIG_INIT) "(pc)\n"
+"  tst.l d0\n"
+"  beq.s 1f\n"
+"  move.l d0,-(sp)\n"
+"  move.l d0,-(sp)\n"
+"  jsr _rom_install(pc)\n"
+"  addq.l #4,sp\n"
+"  move.l (sp)+,d0\n"
+"1: rts\n"
+);
+#endif
+/* Variables live in the code, so the ROM build reaches them PC-relative. */
+__asm(
+"  .text\n"
+"  .even\n"
+"  .globl _SysBase\n"
+"_SysBase: .long 0\n"
+"  .globl _pt\n"
+"_pt: .long 0\n"
+"  .globl _old_beginio\n"
+"_old_beginio: .long 0\n"
+);
 
 #include <exec/execbase.h>
 #include <exec/memory.h>
@@ -40,7 +80,11 @@ __asm("  .text\n  jmp _start\n");
 #endif
 
 #define DEV_NAME   "mtecscsi.device"
+#ifdef ROM_BUILD
+#define PATCHED_REV 40          /* shown as 2.40 */
+#else
 #define PATCHED_REV 32          /* shown as 2.32 */
+#endif
 #define PORT_NAME  "MTecPatch"
 #define LIMIT      0x80000000UL
 #define MAX_BLOCKS 0x8000UL
@@ -53,8 +97,12 @@ __asm("  .text\n  jmp _start\n");
 #define REMOVE_NODE     0x34    /* size of its TD_REMOVE list node */
 #define TRACK_SECS 63
 
-struct ExecBase *SysBase;
+extern struct ExecBase *SysBase;
+#ifdef ROM_BUILD
+extern struct DosLibrary *DOSBase;  /* never used */
+#else
 struct DosLibrary *DOSBase;
+#endif
 
 #include "gen/stubs.h"
 
@@ -82,10 +130,14 @@ struct Patch {
     UBYTE stack[STACK];
 };
 
+#ifdef ROM_BUILD
+static const char patched_id[] = "mtecscsi.device 2.40 (2.3 with MTecPatch 1.3 in ROM)\r\n";
+#else
 static const char patched_id[] = "mtecscsi.device 2.32 (2.3 with MTecPatch 1.3)\r\n";
+#endif
 
-static struct Patch *pt;
-void *old_beginio;
+extern struct Patch *pt;
+extern void *old_beginio;
 
 static const UWORD supported[] = {
     CMD_RESET, CMD_READ, CMD_WRITE, CMD_UPDATE, CMD_CLEAR, CMD_STOP, CMD_START,
@@ -173,12 +225,12 @@ __asm(
 "_new_beginio:\n"
 "  move.l a1,-(sp)\n"
 "  move.l a1,-(sp)\n"
-"  jsr _route\n"
+"  jsr _route(pc)\n"
 "  addq.l #4,sp\n"
 "  move.l (sp)+,a1\n"
 "  tst.l d0\n"
 "  bne.s 1f\n"
-"  move.l _old_beginio,a0\n"
+"  move.l _old_beginio(pc),a0\n"
 "  jmp (a0)\n"
 "1: rts\n"
 );
@@ -538,6 +590,7 @@ static void task_main(void)
     }
 }
 
+#ifndef ROM_BUILD
 static void status(struct Patch *p)
 {
     P("Requests left to the driver: %lu\n", p->passed);
@@ -553,28 +606,16 @@ static void status(struct Patch *p)
     P("Failed requests:             %lu\n", p->errors);
 }
 
-static LONG install(void)
-{
-    struct Library *dev;
-    struct Task *t;
-    struct Patch *p;
+#endif
 
-    Forbid();
-    dev = (struct Library *)FindName(&SysBase->DeviceList, (STRPTR)DEV_NAME);
-    Permit();
-    if (!dev) {
-        P(DEV_NAME " is not running\n");
-        return RETURN_FAIL;
-    }
-    if (dev->lib_Version != 2 || dev->lib_Revision != 3) {
-        P("Written for " DEV_NAME " 2.3, this is %ld.%ld\n", dev->lib_Version, dev->lib_Revision);
-        return RETURN_FAIL;
-    }
-    p = (struct Patch *)AllocMem(sizeof(*p), MEMF_PUBLIC | MEMF_CLEAR);
-    if (!p) {
-        P("Out of memory\n");
-        return RETURN_FAIL;
-    }
+/* Starts the task, then sends the device's requests through route(). */
+static struct Patch *start_patch(struct Library *dev)
+{
+    struct Task *t;
+    struct Patch *p = (struct Patch *)AllocMem(sizeof(*p), MEMF_PUBLIC | MEMF_CLEAR);
+
+    if (!p)
+        return NULL;
     pt = p;
     p->parent = (struct Task *)FindTask(NULL);
     t = &p->task;
@@ -592,6 +633,37 @@ static LONG install(void)
     old_beginio = (void *)SetFunction(dev, DEV_BEGINIO, new_beginio);
     dev->lib_Revision = PATCHED_REV;
     dev->lib_IdString = (APTR)patched_id;
+    return p;
+}
+
+#ifdef ROM_BUILD
+__attribute__((used)) void rom_install(struct Library *dev)
+{
+    if (dev->lib_Version == 2 && dev->lib_Revision == 3)
+        start_patch(dev);
+}
+#else
+static LONG install(void)
+{
+    struct Library *dev;
+    struct Patch *p;
+
+    Forbid();
+    dev = (struct Library *)FindName(&SysBase->DeviceList, (STRPTR)DEV_NAME);
+    Permit();
+    if (!dev) {
+        P(DEV_NAME " is not running\n");
+        return RETURN_FAIL;
+    }
+    if (dev->lib_Version != 2 || dev->lib_Revision != 3) {
+        P("Written for " DEV_NAME " 2.3, this is %ld.%ld\n", dev->lib_Version, dev->lib_Revision);
+        return RETURN_FAIL;
+    }
+    p = start_patch(dev);
+    if (!p) {
+        P("Out of memory\n");
+        return RETURN_FAIL;
+    }
 
     /* Keep this code loaded after the program ends. */
     ((struct CommandLineInterface *)BADDR(((struct Process *)p->parent)->pr_CLI))->cli_Module = 0;
@@ -637,3 +709,4 @@ LONG start(void)
     }
     return rc;
 }
+#endif
