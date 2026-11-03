@@ -196,6 +196,11 @@ holds the same 16 KB image twice, at `$0000` and `$8000`. `$4000`-`$7FFF` and
 `$C000`-`$FFFF` are all zero. The card shows the 16 KB at `$0000` on even
 addresses of `$E90000`-`$E97FFF`. A new chip should keep that layout.
 
+Jumpers: JP1 and JP2 next to the socket switch the memory and the card on and off.
+A 3-pin jumper below the EPROM has no label and its function isn't known. It may
+select the use of EPROM pin 1, which is `A15` on a 27C512. The two copies of the image make `A15`
+irrelevant, so leave the jumper where it is.
+
 Offsets below are into the 16 KB image:
 
 | Offset | Contents |
