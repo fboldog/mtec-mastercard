@@ -189,6 +189,36 @@ by measuring the 53CF94 pins:
 Dropped. Sync negotiated at every rate but was slower than async, gave read errors
 and damaged memory. See [`sync_scsi_learning.md`](MTecPatch/sync_scsi_learning.md).
 
+### ROM layout
+
+The ROM is a socketed TI TMS27C512-10 EPROM, 64 KB. Read in a programmer, it
+holds the same 16 KB image twice, at `$0000` and `$8000`. `$4000`-`$7FFF` and
+`$C000`-`$FFFF` are all zero. The card shows the 16 KB at `$0000` on even
+addresses of `$E90000`-`$E97FFF`. A new chip should keep that layout.
+
+Offsets below are into the 16 KB image:
+
+| Offset | Contents |
+|---|---|
+| `$0000`-`$003F` | Autoconfig data, so a bad image can hide the SCSI board |
+| `$0040`-`$01FF` | `DiagArea`, nibble-wide: each byte is the high nibbles of two image bytes |
+| `$0200`-`$25DF` | Driver, byte-wide, copied to RAM as is |
+| `$25E0`-`$3FFF` | Zero, 6688 bytes free |
+
+The decoded `DiagArea` is `$DE` bytes, flags `$10` (nibble-wide, config time).
+
+- **`DiagPoint` (`$46`):** `AllocMem(9184)`, then copies 9184 bytes (`$23E0`) of the
+  driver from board `+$400` with `movep.l`. It then fixes up a `RomTag` at `$B4`
+  in the RAM copy of the `DiagArea`.
+- **`RomTag`:** `RTF_COLDSTART|RTF_AUTOINIT`, version 2, `NT_DEVICE`, priority 1.
+  Name, ID string and the autoinit table (data size, function table, data table,
+  init routine) are offsets into the copied driver.
+- **`BootPoint` (`$40`):** jumps to the start of the copied driver, which is its
+  boot code.
+- **Space:** the copy length is a single constant, and there is no checksum. The
+  driver can grow to `$3E00` bytes, which leaves 6688 bytes for new code. That code
+  is copied without relocation, so it must be position-independent.
+
 ### Driver notes
 
 - ROM board at `$E90000`, with data on even addresses. The driver is stored as a
