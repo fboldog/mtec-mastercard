@@ -407,8 +407,52 @@ them). In Amiberry the interrupt build keeps exactly 20.0 ms; the polled one
 reaches 22.8 ms there, and more is expected on the card, where chunks take
 longer.
 
+#### Boot ROM
+
+`MCDevice/build.sh` also builds boot ROMs with nothing from M-Tec in them:
+- `rom/MCROM-16k.bin` (polled) and `rom/MCROM-irq-16k.bin` (interrupt-driven), for
+  the emulator;
+- `rom/MCROM-27C512.bin` and `rom/MCROM-irq-27C512.bin`, the same image in all four
+  quarters, for the EPROM.
+
+| Image | Contents |
+|---|---|
+| `$0000`-`$003F` | Autoconfig data: the card's own manufacturer and product numbers, so the driver finds its board |
+| `$0040`-`$01FF` | Our DiagArea (`rom/diag.s`), nibble-wide |
+| `$0200`- | The driver, byte-wide, with a relocation table (`rom/pack.py`) |
+
+At boot:
+1. **Autoconfig:** expansion.library runs the DiagArea's DiagPoint.
+2. **Loading the driver:** DiagPoint copies the driver into RAM, relocates it, and
+   fills in the RomTag in the DiagArea from the driver's own, adding
+   `RTF_COLDSTART`.
+3. **Starting the driver:** exec starts it with the other residents, after
+   timer.device and before dos.library.
+4. **Mounting:** the driver resets the bus, then looks at targets 0-6, LUN 0. On
+   each disk with 512-byte blocks it reads the RDB, and:
+   - loads each file system stored in the RDB with its own hunk loader, unless
+     FileSystem.resource already has that version or a newer one, since
+     dos.library isn't running yet;
+   - adds a boot node for each partition: bootable ones with their boot
+     priority, the others with -128, so they mount but don't boot.
+5. **Booting:** BootPoint starts dos.library, which boots from the highest
+   boot priority.
+
+The polled ROM's driver is 10,124 bytes in memory and leaves 5,396 bytes of the
+ROM free; the interrupt one leaves 4,316.
+
+Tested in Amiberry with Kickstart 3.1, from the ROM alone, no floppy:
+- **Booting:** from an FFS partition at 2.5-3.5 GB, with FFS 46 loaded from the
+  RDB.
+- **A second file system:** a PFS3 partition, with pfs3aio loaded from the RDB,
+  mounted read/write.
+- **Writing:** a file copied on the Amiga matches on the host.
+
+Both variants pass. The real card hasn't run it yet.
+
 Not done yet:
-- the boot ROM: our own loader, RDB mounting and booting
+- the boot ROM on the real card
+- disks with other block sizes and LUNs above 0 at boot
 - disconnection
 - detecting medium changes without a command
 - a test on the real card. The 8-byte mode and `$D039` aren't modelled by the

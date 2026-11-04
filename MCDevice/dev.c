@@ -40,6 +40,7 @@ __asm("  .text\n  moveq #-1,d0\n  rts\n");
 #define TASK_STACK 4096
 #define MAX_XFER   0x100000UL   /* bytes per SCSI command, in 64 KB DMA chunks */
 #define MC_PROBE   0x7FF0       /* private: open a unit */
+#define MC_MOUNT   0x7FF2       /* private, ROM build: add the partitions at start-up */
 #define TRIES      3
 
 struct ExecBase *SysBase;
@@ -340,6 +341,10 @@ static void diag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     ior->io_Actual = sizeof *d;
 }
 
+#ifdef ROM_BUILD
+#include "boot.c"
+#endif
+
 static void perform(struct MC *mc, struct IOStdReq *ior)
 {
     struct MCUnit *u = (struct MCUnit *)ior->io_Unit;
@@ -350,6 +355,11 @@ static void perform(struct MC *mc, struct IOStdReq *ior)
     case MC_PROBE:
         probe(mc, ior);
         break;
+#ifdef ROM_BUILD
+    case MC_MOUNT:
+        mount_all(mc, ior);
+        break;
+#endif
     case CMD_READ:
     case ETD_READ:
         rw(mc, u, ior, 0, ior->io_Offset, 0);
@@ -508,6 +518,30 @@ static struct MC *dev_init(struct MC *mc __asm("d0"), BPTR seg __asm("a0"), stru
     mc->irq.is_Data = mc;
     mc->irq.is_Code = mc_irq_entry;
     AddIntServer(INTB_PORTS, &mc->irq);
+#ifdef ROM_BUILD
+    {
+        /* Mount the partitions now, before dos.library starts booting. The
+           task does the SCSI work; this waits for it. */
+        struct MsgPort mp;
+        struct IOStdReq mr;
+        memset(&mp, 0, sizeof mp);
+        mp.mp_Node.ln_Type = NT_MSGPORT;
+        mp.mp_Flags = PA_SIGNAL;
+        mp.mp_SigBit = SIGB_SINGLE;
+        mp.mp_SigTask = (struct Task *)FindTask(0);
+        NewList(&mp.mp_MsgList);
+        memset(&mr, 0, sizeof mr);
+        mr.io_Message.mn_ReplyPort = &mp;
+        mr.io_Message.mn_Length = sizeof mr;
+        mr.io_Device = (struct Device *)&mc->lib;
+        mr.io_Command = MC_MOUNT;
+        mr.io_Data = cd;
+        SetSignal(0, SIGF_SINGLE);
+        PutMsg(mc->port, &mr.io_Message);
+        WaitPort(&mp);
+        GetMsg(&mp);
+    }
+#endif
     return mc;
 fail:
     FreeMem((UBYTE *)mc - mc->lib.lib_NegSize, mc->lib.lib_NegSize + mc->lib.lib_PosSize);
