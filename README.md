@@ -32,7 +32,8 @@ Results from this one setup may not apply to other cards or disks.
 | `MTecPatch/Reboot.c` | Reboots the Amiga |
 | `MTecPatch/disk/` | Startup scripts for the floppies |
 | `MTecPatch/*.sh` | Program and floppy image builders |
-| `MTecPatch/mkrom.py`, `mkrom.sh` | Builds a boot ROM with the patch inside |
+| `MTecPatch/mkrom.py`, `mkrom.sh` | Builds a boot ROM with the patch inside, by patching the original image |
+| `MTecROM/` | Builds the same boot ROM from source: turns the ROM into assembler source, then assembles it with the patch |
 | `MTecPatch/logs/` | Logs from real hardware |
 | `MTecPatch/sync_scsi_learning.md` | Why sync SCSI was dropped |
 | `MTecDump/` | ROM and RAM dump tool, plus the small `More` pager |
@@ -307,6 +308,33 @@ cd MTecPatch && ./mkrom.sh ../mastercard-27C512-eprom.rom
 ```
 
 It takes the 64 KB chip read or the 16 KB dump, and both give the same result.
+
+### ROM image from source
+
+```sh
+cd MTecROM && ./build.sh ../mastercard-27C512-eprom.rom
+```
+
+This builds the whole ROM from assembler source instead of patching bytes in the
+original. That makes it possible to change the driver itself, or add code such as
+a boot menu, with labels in place of fixed offsets.
+
+1. `dis2src.py` turns the ROM into `build/src/driver.s` and `build/src/diag.s`.
+   It follows the code from the entry points and tables named in `symbols.txt`,
+   and checks every instruction by assembling it again. 8626 of the driver's 9184
+   bytes come out as instructions, and the rest are strings, tables and padding.
+   The source is M-Tec's code, so it is generated from your own ROM into the
+   ignored `build/` folder and never goes in git.
+2. `build.py` first assembles the source without the patch and checks that it
+   gives the original 16 KB image byte for byte, including the autoconfig data and
+   the nibble-wide DiagArea.
+3. It then assembles `MTecPatch.c`, compiled to assembler, in the same unit right
+   after the driver. The patch calls the driver's init by name (`_mtec_init`), and
+   the DiagArea takes its copy length and init routine from the symbols.
+
+The result, `build/MTecROM-27C512.bin`, is identical to the one `mkrom.sh` makes
+(SHA-1 `9b882e35a12d3d4cbcfe40c6211b04d0475d2b84`), so the emulator results above
+apply to it.
 
 ### Floppy images
 

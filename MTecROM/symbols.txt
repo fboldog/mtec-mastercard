@@ -1,0 +1,28 @@
+# Names for the generated ROM source: section offset kind name
+# section: driver (offset from image $0200) or diag (DiagArea offset)
+# kind: code (an entry point to follow), data, label, wtable (word offset table)
+driver 0000 code  run_from_cli
+driver 0014 wtable functable
+driver 002c data  datatable
+driver 0040 code  _mtec_init
+diag   0040 code  BootPoint
+diag   0046 code  DiagPoint
+driver 140a wtable29 cmdtable
+driver 1444 code  copy_block
+driver 14b6 code  L14b6
+driver 1540 data  task_seglist
+driver 1544 code  task_entry
+driver 16a4 data  L16a4
+driver 18ae code  L18ae
+driver 222a code  L222a
+driver 0684 data  bitmask_table
+driver 1744 code  cache_clear
+driver 1d2c data  sense_cdb
+driver 21c2 data  irq_status_masks
+driver 21f6 rtable13:4:-0x30 irq_handlers
+driver 226a code  xfer_a
+driver 22c4 code  xfer_b
+driver 2320 code  xfer_c
+driver 2378 code  xfer_d
+driver 03d8 data  drv_name
+driver 0423 data  drv_idstring

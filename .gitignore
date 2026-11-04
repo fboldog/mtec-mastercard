@@ -10,6 +10,8 @@ InstallDisk3.02.*
 Turbo-Test/
 Turbo-Test.*
 MTecDump/emu/
+# Generated from the ROM: M-Tec's driver as source, and the built ROM
+MTecROM/build/
 
 # Build output
 MTecDump/MTecDump

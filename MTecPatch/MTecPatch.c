@@ -18,7 +18,7 @@
  * without autosense, where the driver returns the raw SCSI status byte.
  *
  * Built with ROM_BUILD, the same code becomes a blob for the card's boot ROM
- * (see mkrom.py). The blob is copied to RAM right after the driver, without
+ * (see mkrom.py, or MTecROM for the build from source). The blob is copied to RAM right after the driver, without
  * relocation, so it is built PC-relative and keeps its variables in the code.
  * The device's init routine points at rom_entry, which runs the driver's own
  * init and then installs the patch before anything can boot.
@@ -30,14 +30,21 @@ __asm("  .text\n  jmp _start\n");
 #define STR_(x) #x
 #define STR(x) STR_(x)
 /* Called as the device's init routine: d0 = device, a0 = segment, a6 = SysBase.
-   ORIG_INIT is the distance from here back to the driver's init routine. */
+   For mkrom.py, ORIG_INIT is the distance from here back to the driver's init
+   routine. The source build (MTecROM) assembles this with the driver, so it
+   calls the driver's init by name. */
+#ifdef ORIG_INIT
+#define CALL_INIT "  jsr _rom_entry-" STR(ORIG_INIT) "(pc)\n"
+#else
+#define CALL_INIT "  jsr _mtec_init(pc)\n"
+#endif
 __asm(
 "  .text\n"
 "  .globl _rom_entry\n"
 "_rom_entry:\n"
 "  lea _SysBase(pc),a1\n"
 "  move.l a6,(a1)\n"
-"  jsr _rom_entry-" STR(ORIG_INIT) "(pc)\n"
+CALL_INIT
 "  tst.l d0\n"
 "  beq.s 1f\n"
 "  move.l d0,-(sp)\n"
