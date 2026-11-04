@@ -38,7 +38,7 @@ __asm("  .text\n  moveq #-1,d0\n  rts\n");
 #define VERSION    0
 #define REVISION   1
 #define TASK_STACK 4096
-#define MAX_XFER   0x40000UL    /* bytes per SCSI command */
+#define MAX_XFER   0x100000UL   /* bytes per SCSI command, in 64 KB DMA chunks */
 #define MC_PROBE   0x7FF0       /* private: open a unit */
 #define TRIES      3
 

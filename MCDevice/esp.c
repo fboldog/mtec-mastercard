@@ -17,6 +17,7 @@
 #define REG(mc, n) ((mc)->board[MC_REGS + ((n) << 3)])
 #define SPIN_LIMIT 0x00080000UL     /* polls without progress before a DMA chunk gives up, ~0.5 s */
 #define MAX_PHASES 64
+#define FAST_POLLS 4000             /* about 1 ms on a 50 MHz 68030 */
 
 static inline void wr(struct MC *mc, int n, UBYTE v) { REG(mc, n) = v; }
 static inline UBYTE rd(struct MC *mc, int n) { return REG(mc, n); }
@@ -80,6 +81,12 @@ void mc_delay(struct MC *mc, ULONG micros)
 /* Waits for the chip's interrupt; returns 0 after the time-out. */
 static int wait_int(struct MC *mc, ULONG secs)
 {
+    /* Most interrupts come within microseconds: watch for the server's flag
+       for about a millisecond before paying for a timer request and a task
+       switch. Slow ones (seeks, a missing target) still sleep. */
+    ULONG k;
+    for (k = 0; k < FAST_POLLS && !mc->ipending; k++)
+        ;
     if (!mc->ipending) {
         mc->treq.tr_node.io_Command = TR_ADDREQUEST;
         mc->treq.tr_time.tv_secs = secs;
