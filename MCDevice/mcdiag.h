@@ -33,6 +33,8 @@ struct MCStats {
     UBYTE pad;
     ULONG drained;          /* words read after the chip finished */
     ULONG stray;            /* board requests the interrupt server cleared, so far */
+    ULONG irqs;             /* IRQXFER: server entries during the data phase */
+    ULONG sleeps;           /* waits that needed the timer: the short poll ran out */
 };
 
 struct MCDiagReq {

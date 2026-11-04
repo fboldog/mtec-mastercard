@@ -20,6 +20,7 @@ void *memset(void *d, int c, unsigned long n);
 #define SPIN_LIMIT 0x00080000UL     /* polls without progress before a DMA chunk gives up, ~0.5 s */
 #define MAX_PHASES 64
 #define FAST_POLLS 4000             /* about 1 ms on a 50 MHz 68030 */
+#define IRQ_ROUNDS 4                /* IRQXFER: 32 flag tests, a few us, before the server leaves */
 
 static inline void wr(struct MC *mc, int n, UBYTE v) { REG(mc, n) = v; }
 static inline UBYTE rd(struct MC *mc, int n) { return REG(mc, n); }
@@ -99,6 +100,7 @@ static int wait_int(struct MC *mc, ULONG secs)
     for (k = 0; k < FAST_POLLS && !mc->ipending; k++)
         ;
     if (!mc->ipending) {
+        mc->sleeps++;
         mc->treq.tr_node.io_Command = TR_ADDREQUEST;
         mc->treq.tr_time.tv_secs = secs;
         mc->treq.tr_time.tv_micro = 0;
@@ -365,7 +367,7 @@ static ULONG irq_move(struct MC *mc)
         f.buf = x->p;
         f.bursts = x->left >> 4;
         f.stat = &REG(mc, R_STAT);
-        f.limit = 1;                    /* one round of 8 flag tests, then leave */
+        f.limit = IRQ_ROUNDS;           /* rounds of 8 flag tests before leaving */
         if (x->in)
             fast16_in(&f);
         else
@@ -441,7 +443,9 @@ static void irq_finish(struct MC *mc, UBYTE st)
    or the chip interrupted, so other INT2 sources (CIA-A) still get served. */
 static LONG irq_xfer(struct MC *mc)
 {
-    ULONG moved = irq_move(mc);
+    ULONG moved;
+    mc->x.st.irqs++;
+    moved = irq_move(mc);
     UBYTE st = rd(mc, R_STAT);
     if (st & ST_INT) {
         irq_finish(mc, st);
@@ -484,6 +488,7 @@ static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     st->fifo += x->st.fifo;
     st->chunks += x->st.chunks;
     st->drained += x->st.drained;
+    st->irqs += x->st.irqs;
     st->tcleft = x->st.tcleft;
     st->dreq16 = x->st.dreq16;
     st->dreq8 = x->st.dreq8;

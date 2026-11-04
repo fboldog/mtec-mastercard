@@ -137,6 +137,7 @@ struct MC {
     struct MCUnit *units[MAX_TARGET * MAX_LUN];
     UBYTE sense[32];
     ULONG stray;                /* board requests nobody was moving */
+    ULONG sleeps;               /* waits that needed the timer */
     struct Xfer x;
 };
 

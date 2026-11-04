@@ -320,6 +320,7 @@ static void diag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
 {
     struct MCDiagReq *d = ior->io_Data;
     struct Cmd c;
+    ULONG s0;
 
     if (ior->io_Length < sizeof *d || d->mode >= MCMODES || d->cdblen > 16) {
         ior->io_Error = IOERR_BADLENGTH;
@@ -327,6 +328,7 @@ static void diag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     }
     memset(&d->st, 0, sizeof d->st);
     memset(&c, 0, sizeof c);
+    s0 = mc->sleeps;
     c.cdb = d->cdb;
     c.cdblen = d->cdblen;
     c.in = d->in;
@@ -338,6 +340,7 @@ static void diag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     d->actual = c.actual;
     d->status = c.status;
     d->st.stray = mc->stray;
+    d->st.sleeps = mc->sleeps - s0;
     ior->io_Actual = sizeof *d;
 }
 

@@ -254,10 +254,10 @@ static LONG run(UBYTE mode, const UBYTE *cdb, UWORD cdblen, UBYTE in, UBYTE *dat
 static void stats(void)
 {
     struct MCStats *s = &dr.st;
-    P(" b%lu w%lu f%lu c%lu p%lu tc%lx [%02lx %02lx %02lx] st%02lx in%02lx sq%02lx ff%02lx d%lu x%lu t%luus\n",
+    P(" b%lu w%lu f%lu c%lu p%lu tc%lx [%02lx %02lx %02lx] st%02lx in%02lx sq%02lx ff%02lx d%lu x%lu i%lu z%lu t%luus\n",
       s->bursts, s->words, s->fifo, s->chunks, s->maxpolls, s->tcleft,
       (ULONG)s->dreq16, (ULONG)s->dreq8, (ULONG)s->dreqw,
-      (ULONG)s->stat, (ULONG)s->intr, (ULONG)s->seq, (ULONG)s->fflags, s->drained, s->stray, lastus);
+      (ULONG)s->stat, (ULONG)s->intr, (ULONG)s->seq, (ULONG)s->fflags, s->drained, s->stray, s->irqs, s->sleeps, lastus);
 }
 
 /* The normal mode (DMA16) into ref, then the others into got, compared with
@@ -592,14 +592,24 @@ static void speed_tests(void)
             stats();
         }
     }
-    cdb[7] = 0;
-    cdb[8] = 1;
-    t0 = now();
-    for (j = 0; j < 64; j++)
-        if (run(MCMODE_DMA16, cdb, 10, 1, got, bsize) || dr.status)
-            break;
-    dt = now() - t0;
-    P("SPEED 1 block x64  DMA16 %lu us per command\n", ticks_us(dt) / 64);
+    {
+        /* Command time for 1 block and for 8 KB, like devtest's latency
+           test; the last command's counters show server entries (i) and
+           timer sleeps (z). */
+        static const UWORD sizes[] = { 512, 8192 };
+        for (k = 0; k < 2; k++) {
+            ULONG nb = sizes[k] / bsize ? sizes[k] / bsize : 1;
+            cdb[7] = 0;
+            cdb[8] = nb;
+            t0 = now();
+            for (j = 0; j < 64; j++)
+                if (run(MCMODE_DMA16, cdb, 10, 1, got, nb * bsize) || dr.status)
+                    break;
+            dt = now() - t0;
+            P("SPEED %4lu B x64    DMA16 %lu us per command", nb * bsize, ticks_us(dt) / 64);
+            stats();
+        }
+    }
 }
 
 static int open_unit(ULONG unit)
