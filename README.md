@@ -80,7 +80,7 @@ the card's ROM. The driver then reports itself as `mtecscsi.device` 2.40.
   now get `HFERR_BadStatus` instead of the raw status. The driver only checks those
   for zero, non-zero and 44, and the patch keeps 44, so its behaviour is unchanged.
 - **Output:** `MTecPatchROM-16k.bin` for Amiberry, and `MTecPatchROM-27C512.bin` to
-  program, with the same layout as the original chip. Neither goes in git,
+  program, with the image in all four quarters (see [ROM layout](#rom-layout)). Neither goes in git,
   because both contain M-Tec's driver.
 
 Results in Amiberry, with Kickstart 3.1:
@@ -229,12 +229,16 @@ and damaged memory. See [`sync_scsi_learning.md`](MTecPatch/sync_scsi_learning.m
 The ROM is a socketed TI TMS27C512-10 EPROM, 64 KB. Read in a programmer, it
 holds the same 16 KB image twice, at `$0000` and `$8000`. `$4000`-`$7FFF` and
 `$C000`-`$FFFF` are all zero. The card shows the 16 KB at `$0000` on even
-addresses of `$E90000`-`$E97FFF`. A new chip should keep that layout.
+addresses of `$E90000`-`$E97FFF`.
+
+On the board, socket pins 1 (`A15`) and 27 (`A14`) are tied to ground (0.8 Ω to
+pin 14), so the card only ever reads the first 16 KB of the chip. The rest of a
+27C512 can't be reached without cutting traces. The programmer image still holds
+the patched image in all four quarters, which costs nothing and also suits a
+chip that ends up in a socket wired differently.
 
 Jumpers: JP1 and JP2 next to the socket switch the memory and the card on and off.
-A 3-pin jumper below the EPROM has no label and its function isn't known. It may
-select the use of EPROM pin 1, which is `A15` on a 27C512. The two copies of the image make `A15`
-irrelevant, so leave the jumper where it is.
+The unlabelled 3-pin jumper below the EPROM is for the LED and nothing else.
 
 Offsets below are into the 16 KB image:
 

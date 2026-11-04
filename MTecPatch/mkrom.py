@@ -6,7 +6,8 @@
 ORIGINAL is the card's ROM: the 16 KB image, or the full 64 KB 27C512 read.
 BLOB is the ROM_BUILD hunk file of MTecPatch.c. OUT16 is the 16 KB image the
 card shows, for the emulator. OUT64 is the 27C512 image to program: the image
-at $0000 and $8000, zeros elsewhere, like the original chip.
+in all four 16 KB quarters. The socket ties A14 and A15 to ground, so only
+$0000 is read, but filling all four makes the chip work in any wiring.
 
 The ROM loader in the DiagArea copies COPY_LEN bytes of driver from image
 $0200 to RAM and fixes up a RomTag whose init routine is driver offset $40.
@@ -133,7 +134,7 @@ def main():
     print("DiagArea bytes changed at image", " ".join("$%04X" % k for k in changed))
 
     open(out16, "wb").write(img)
-    open(out64, "wb").write(bytes(img) + bytes(0x4000) + bytes(img) + bytes(0x4000))
+    open(out64, "wb").write(bytes(img) * 4)
     print("%s sha1 %s" % (out16, hashlib.sha1(img).hexdigest()))
     print("%s sha1 %s" % (out64, hashlib.sha1(open(out64, "rb").read()).hexdigest()))
 
