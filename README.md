@@ -356,6 +356,26 @@ The defaults only read the disk. `Execute S:write-test` adds disk writes 300
 blocks before the end: each block is saved, written in every mode, read back,
 checked, and restored.
 
+On the real card (A1200, Kickstart 3.0, BlueSCSI Pico, original EPROM with the
+takeover), see `MCDevice/logs/`:
+
+| Check | First run | After the fixes |
+|---|---|---|
+| Reads, all four modes | identical | identical, 74 ok, 0 failed |
+| Odd lengths (INQUIRY 37, 255) | hung until the time-out | pass in all modes |
+| Disk writes of 1, 8 and 129 blocks, all modes | pass, restored | pass, restored, 93 ok, 0 failed |
+| Stray board interrupts | none | none |
+| devtest read speed, 512 / 128 / 32 KB | 3668 / 3573 / 3031 KB/s | 5377 / 5184 / 4178 KB/s |
+
+What the real board showed:
+- **`$C839` works:** the 8-byte flag is real hardware, not only an M-Tec setting.
+- **The flags:** they read `$39` at rest and `$B9` when set, so only bit 7 counts.
+- **Odd lengths:** the board moves whole words, so the last byte of an odd length
+  takes one more word access, of which only the high byte counts.
+- **Speed:** reads are CPU-bound. M-Tec's driver still reads at about 6 MB/s.
+- **BlueSCSI:** it takes WRITE BUFFER, but doesn't give the data back, so the
+  buffer tests skip on it.
+
 In Amiberry, with the original ROM and the takeover, DMA16 and WORD pass every
 read and write test. The emulator models neither `$C839` nor the chip's PIO
 transfers, so `NODMA8` and `NOPIO` leave those modes out there.
