@@ -2,6 +2,7 @@
 # Builds MCTest.adf, the real-hardware test disk for mastercard.device.
 # AmigaDOS commands come from the user's own InstallDisk3.02, devtest from
 # the scratch folder (https://github.com/cdhooper/amiga_devtest).
+# DRIVER=mastercard-irq.device puts the interrupt-driven variant on the disk.
 cd "$(dirname "$0")" || exit 1
 I=../InstallDisk3.02; S=$HOME/development/claude-scratch/mtec
 A=${1:-MCTest.adf}
@@ -9,7 +10,7 @@ A=${1:-MCTest.adf}
 rm -f "$A"
 xdftool "$A" format MCTEST ffs + boot install + makedir C + makedir S + makedir Devs \
     + write disk/startup-sequence S/Startup-Sequence + write disk/write-test S/write-test + write disk/mtec-speed S/mtec-speed \
-    + write mastercard.device Devs/mastercard.device + write MCDiag C/MCDiag \
+    + write ${DRIVER:-mastercard.device} Devs/mastercard.device + write MCDiag C/MCDiag \
     + write ../MTecDump/More C/More + write $S/dt/devtest_1.9/devtest C/devtest >/dev/null || exit 1
 for c in Echo Execute Wait Type Version Info Dir Assign MakeDir; do
     xdftool "$A" write $I/c/$c C/$c >/dev/null || exit 1

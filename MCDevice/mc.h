@@ -109,6 +109,16 @@ struct MCUnit {
     struct List changeints;
 };
 
+/* A data phase run by the interrupt server (IRQXFER builds). */
+struct Xfer {
+    UBYTE *p;               /* next byte */
+    ULONG left;             /* bytes still to move in this chunk */
+    ULONG n;                /* the chunk */
+    ULONG moved;            /* what the chip moved, set at the end */
+    UBYTE in, active, pad[2];
+    struct MCStats st;
+};
+
 struct MC {
     struct Library lib;
     UWORD pad;
@@ -127,6 +137,7 @@ struct MC {
     struct MCUnit *units[MAX_TARGET * MAX_LUN];
     UBYTE sense[32];
     ULONG stray;                /* board requests nobody was moving */
+    struct Xfer x;
 };
 
 /* One SCSI command, as esp_exec runs it. */

@@ -13,7 +13,8 @@
  * the end.
  *
  * A speed section times 16 reads of 64 KB per mode and one-block commands,
- * and two read comparisons: DMA32 (32 bytes per flag, faster but only safe
+ * with the longest gap between vertical blank interrupts during the reads
+ * (20 ms on PAL when nothing holds interrupts off), and two read comparisons: DMA32 (32 bytes per flag, faster but only safe
  * if the board holds 32 bytes) and MOVEM (DMA16 read with movem.l). They only report; they don't count as failures.
  *
  * Read-only unless WRITE is given. The buffer tests write the drive's own
@@ -487,6 +488,48 @@ static void write_tests(ULONG lba)
     }
 }
 
+/* The vertical blank interrupt, timed while reads run: it comes every 20 ms
+   on PAL (16.7 on NTSC) and gets pushed back while interrupts are off. The
+   biggest gap shows how long the system was deaf. */
+static struct Interrupt vbi;
+static volatile ULONG vb_last, vb_max, vb_count;
+
+LONG vb_server(void)
+{
+    struct EClockVal ev;
+    ReadEClock(&ev);
+    if (vb_count++ && ev.ev_lo - vb_last > vb_max)
+        vb_max = ev.ev_lo - vb_last;
+    vb_last = ev.ev_lo;
+    return 0;
+}
+__asm(
+"  .text\n"
+"  .globl _vb_entry\n"
+"_vb_entry:\n"
+"  movem.l d2-d7/a2-a4,-(sp)\n"
+"  jsr _vb_server\n"
+"  movem.l (sp)+,d2-d7/a2-a4\n"
+"  moveq #0,d0\n"                  /* let the other VERTB servers run */
+"  rts\n");
+extern void vb_entry(void);
+
+static void vb_start(void)
+{
+    vb_last = vb_max = vb_count = 0;
+    vbi.is_Node.ln_Type = NT_INTERRUPT;
+    vbi.is_Node.ln_Pri = 120;
+    vbi.is_Node.ln_Name = (char *)"MCDiag";
+    vbi.is_Code = vb_entry;
+    AddIntServer(INTB_VERTB, &vbi);
+}
+
+static ULONG vb_stop(void)
+{
+    RemIntServer(INTB_VERTB, &vbi);
+    return ticks_us(vb_max);
+}
+
 /* Speed: 16 reads of 64 KB in each mode, timed by the EClock, each checked
    against a DMA16 read; then the time of one command, from 64 reads of one
    block. DMA32 and MOVEM are comparisons, see the top. */
@@ -494,12 +537,15 @@ static void speed_tests(void)
 {
     static const UBYTE modes[] = { MCMODE_DMA16, MCMODE_DMA8, MCMODE_WORD, MCMODE_DMA32, MCMODE_MOVEM };
     UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    ULONG len = 0x10000, n = len / bsize, k, i, j, t0, dt;
+    ULONG len = 0x10000, n = len / bsize, k, i, j, t0, dt, vbmax;
 
     if (!efreq) {
         P("SPEED              skipped: no EClock\n");
         return;
     }
+    vb_start();
+    Delay(25);
+    P("SPEED idle         VBlank gap max %lu us\n", vb_stop());
     cdb[7] = n >> 8;
     cdb[8] = n;
     if (run(MCMODE_DMA16, cdb, 10, 1, ref, len) || dr.status || dr.actual != len) {
@@ -512,6 +558,7 @@ static void speed_tests(void)
         ULONG bad = 0, err = 0;
         if (skipmode[m])
             continue;
+        vb_start();
         t0 = now();
         for (j = 0; j < 16; j++) {
             if (run(m, cdb, 10, 1, got, len) || dr.status || dr.actual != len) {
@@ -525,6 +572,7 @@ static void speed_tests(void)
             }
         }
         dt = now() - t0;
+        vbmax = vb_stop();
         if (err) {
             if (m < MCMODES_STD)
                 fails++;                /* the experiments only report */
@@ -538,8 +586,8 @@ static void speed_tests(void)
                   (ULONG)got[bad - 1], (ULONG)ref[bad - 1], dt ? 1024 * efreq / dt : 0);
             } else {
                 oks++;
-                P("SPEED 64K x16      %-5s same %lu KB/s, %lu us per 64 KB", (ULONG)mname[m],
-                  dt ? 1024 * efreq / dt : 0, ticks_us(dt) / 16);
+                P("SPEED 64K x16      %-5s same %lu KB/s, %lu us per 64 KB, VBlank gap max %lu us", (ULONG)mname[m],
+                  dt ? 1024 * efreq / dt : 0, ticks_us(dt) / 16, vbmax);
             }
             stats();
         }

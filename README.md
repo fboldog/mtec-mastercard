@@ -391,6 +391,22 @@ In Amiberry, with the original ROM and the takeover, DMA16 and WORD pass every
 read and write test. The emulator models neither `$C839` nor the chip's PIO
 transfers, so `NODMA8` and `NOPIO` leave those modes out there.
 
+#### Two variants
+
+`MCDevice/build.sh` builds the same driver twice. Both are named
+`mastercard.device` inside, so you install one of them as `DEVS:mastercard.device`.
+
+| File | How data moves | Trade-off |
+|---|---|---|
+| `mastercard.device` | the driver task copies each 64 KB chunk with all interrupts off | slightly faster, but nothing else runs during a chunk: about 12 ms each on the real card |
+| `mastercard-irq.device` (`-DIRQXFER`) | the INT2 server copies the data whenever the board raises INT2 for it, as M-Tec's driver does | audio, the vertical blank and serial keep running during transfers |
+
+MCDiag measures the difference: its SPEED lines give the longest gap between
+vertical blank interrupts during the reads (20 ms on PAL when nothing delays
+them). In Amiberry the interrupt build keeps exactly 20.0 ms; the polled one
+reaches 22.8 ms there, and more is expected on the card, where chunks take
+longer.
+
 Not done yet:
 - the boot ROM: our own loader, RDB mounting and booting
 - disconnection

@@ -14,6 +14,8 @@
 #include "mc.h"
 #include "gen/stubs.h"
 
+void *memset(void *d, int c, unsigned long n);
+
 #define REG(mc, n) ((mc)->board[MC_REGS + ((n) << 3)])
 #define SPIN_LIMIT 0x00080000UL     /* polls without progress before a DMA chunk gives up, ~0.5 s */
 #define MAX_PHASES 64
@@ -36,9 +38,18 @@ static ULONG drain(struct MC *mc, ULONG n)
     return k;
 }
 
+#ifdef IRQXFER
+static LONG irq_xfer(struct MC *mc);
+#endif
+
 LONG mc_irq(struct MC *mc __asm("a1"))
 {
-    UBYTE st = rd(mc, R_STAT);
+    UBYTE st;
+#ifdef IRQXFER
+    if (mc->x.active)
+        return irq_xfer(mc);
+#endif
+    st = rd(mc, R_STAT);
     if (!(st & ST_INT)) {
         /* The board raises INT2 while it holds data. Outside a transfer
            nobody would move it and INT2 would never clear: drop it, and
@@ -331,6 +342,160 @@ __asm(
 "  rts\n"
 );
 
+#ifdef IRQXFER
+/* Interrupt-driven data phases. The task starts the chip's DMA and sleeps;
+   the board raises INT2 while it holds data (or room), and the server moves
+   it, 16 bytes per flag, until the flag stays clear for 8 tests. The chip's
+   interrupt at the end finishes the chunk and wakes the task. Interrupts
+   above INT2 (audio, vertical blank, serial) keep running throughout, which
+   the polled transfers, done with interrupts off, don't allow. */
+
+/* Moves what the board offers now; returns the bytes moved. */
+static ULONG irq_move(struct MC *mc)
+{
+    struct Xfer *x = &mc->x;
+    volatile UBYTE *f16 = mc->board + MC_DREQ16, *fw = mc->board + MC_DREQW;
+    volatile UWORD *pw = (volatile UWORD *)(mc->board + MC_PORT);
+    ULONG start = x->left;
+
+    if (x->left >= 16 && (*f16 & 0x80)) {
+        struct Fast f;
+        f.flag = f16;
+        f.port = (volatile ULONG *)(mc->board + MC_PORT);
+        f.buf = x->p;
+        f.bursts = x->left >> 4;
+        f.stat = &REG(mc, R_STAT);
+        f.limit = 1;                    /* one round of 8 flag tests, then leave */
+        if (x->in)
+            fast16_in(&f);
+        else
+            fast16_out(&f);
+        x->st.bursts += (x->left >> 4) - f.bursts;
+        x->left -= (UBYTE *)f.buf - x->p;
+        x->p = (UBYTE *)f.buf;
+    }
+    while (x->left && x->left < 16 && ((*f16 | *fw) & 0x80)) {
+        if (x->left >= 2) {
+            if (x->in)
+                *(UWORD *)x->p = *pw;
+            else
+                *pw = *(UWORD *)x->p;
+            x->p += 2;
+            x->left -= 2;
+        } else {                        /* the last byte of an odd length */
+            if (x->in)
+                *x->p = *pw >> 8;
+            else
+                *pw = (UWORD)*x->p << 8;
+            x->p++;
+            x->left = 0;
+        }
+        x->st.words++;
+    }
+    return start - x->left;
+}
+
+/* The chip is done with the chunk: settle the count like dma_phase does,
+   latch the registers and wake the task. */
+static void irq_finish(struct MC *mc, UBYTE st)
+{
+    struct Xfer *x = &mc->x;
+    ULONG rest;
+    UBYTE fifo;
+
+    if (x->in)
+        x->st.drained += drain(mc, 4096);
+    mc->istat = st;
+    mc->iseq = rd(mc, R_SEQ);
+    rest = rd(mc, R_TCLO) | (ULONG)rd(mc, R_TCMID) << 8;
+    fifo = rd(mc, R_FFLAGS) & 0x1F;
+    x->st.tcleft = rest;
+    x->st.fflags = fifo;
+    if (!rest && x->n == 0x10000 && !(st & ST_TC))
+        rest = x->n;
+    x->moved = x->n - rest;
+    if (x->in) {
+        UBYTE *end = x->p - (x->n - x->left) + x->moved;
+        while (fifo-- && x->p < end) {
+            *x->p++ = rd(mc, R_FIFO);
+            x->st.fifo++;
+        }
+    } else if (fifo) {
+        x->moved -= fifo;
+        x->st.fifo += fifo;
+        wr(mc, R_CMD, C_FLUSH);
+    }
+    x->st.dreq16 = mc->board[MC_DREQ16];
+    x->st.dreq8 = mc->board[MC_DREQ8];
+    x->st.dreqw = mc->board[MC_DREQW];
+    mc->iintr = rd(mc, R_INTR);
+    x->st.stat = st;
+    x->st.intr = mc->iintr;
+    x->st.seq = mc->iseq;
+    x->active = 0;
+    mc->ipending = 1;
+    Signal(mc->task, mc->irqsig);
+}
+
+/* The server while a transfer is running. Claims INT2 only if it moved data
+   or the chip interrupted, so other INT2 sources (CIA-A) still get served. */
+static LONG irq_xfer(struct MC *mc)
+{
+    ULONG moved = irq_move(mc);
+    UBYTE st = rd(mc, R_STAT);
+    if (st & ST_INT) {
+        irq_finish(mc, st);
+        return 1;
+    }
+    return moved != 0;
+}
+
+/* One chunk, moved by the server. The task sleeps until the chip is done. */
+static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
+{
+    struct Xfer *x = &mc->x;
+    ULONG left = c->len - c->actual, n = left > 0x10000 ? 0x10000 : left;
+
+    memset(&x->st, 0, sizeof x->st);
+    x->p = c->data + c->actual;
+    x->left = n;
+    x->n = n;
+    x->in = c->in;
+    x->moved = 0;
+    wr(mc, R_TCLO, n);
+    wr(mc, R_TCMID, n >> 8);
+    mc->ipending = 0;
+    x->st.chunks = 1;
+    x->active = 1;
+    wr(mc, R_CMD, C_DMA | C_TI);
+    if (!wait_int(mc, 30)) {
+        Disable();
+        x->active = 0;
+        wr(mc, R_CMD, C_RESET);         /* drops the board's request */
+        wr(mc, R_CMD, C_NOP);
+        (void)rd(mc, R_INTR);
+        Enable();
+        return HFERR_DMA;
+    }
+    mc->ipending = 1;                   /* esp_exec goes on from the latched registers */
+    c->actual += x->moved;
+    st->bursts += x->st.bursts;
+    st->words += x->st.words;
+    st->fifo += x->st.fifo;
+    st->chunks += x->st.chunks;
+    st->drained += x->st.drained;
+    st->tcleft = x->st.tcleft;
+    st->dreq16 = x->st.dreq16;
+    st->dreq8 = x->st.dreq8;
+    st->dreqw = x->st.dreqw;
+    st->fflags = x->st.fflags;
+    st->stat = x->st.stat;
+    st->intr = x->st.intr;
+    st->seq = x->st.seq;
+    return 0;
+}
+#endif
+
 /* Moves one DMA chunk of a data phase. Runs disabled; ends at the chip's
    interrupt, whose registers it latches like mc_irq would.
    MCMODE_DMA16: 16 bytes each time $C039 says so, then words.
@@ -537,7 +702,13 @@ static LONG data_phase(struct MC *mc, struct Cmd *c)
     struct MCStats dummy, *st = c->st ? c->st : &dummy;
     if (c->actual >= c->len)
         return HFERR_Phase;             /* the target wants more than we have */
-    return c->mode == MCMODE_PIO ? pio_phase(mc, c, st) : dma_phase(mc, c, st);
+    if (c->mode == MCMODE_PIO)
+        return pio_phase(mc, c, st);
+#ifdef IRQXFER
+    if (c->mode == MCMODE_DMA16)
+        return irq_phase(mc, c, st);    /* the other modes stay polled, for MCDiag */
+#endif
+    return dma_phase(mc, c, st);
 }
 
 LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
