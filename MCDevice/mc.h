@@ -103,10 +103,11 @@ struct MCUnit {
     UBYTE type;             /* peripheral device type from INQUIRY */
     UBYTE removable;
     UBYTE shift;            /* log2 of the block size, 0 until known */
-    UBYTE pad;
+    UBYTE wprot;            /* write-protected, for TD_PROTSTATUS */
     ULONG blocks;           /* last LBA + 1, 0 if unknown or over 4G */
     ULONG changes;          /* TD_CHANGENUM */
     struct List changeints;
+    struct Interrupt *remove;   /* TD_REMOVE's interrupt, or 0 */
 };
 
 /* A data phase run by the interrupt server (IRQXFER builds). */

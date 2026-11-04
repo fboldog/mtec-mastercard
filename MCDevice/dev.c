@@ -8,8 +8,9 @@
  * fail with TDERR_DiskChanged after a medium change) and their 64-bit forms
  * (TD64, NSD and NSD ETD), HD_SCSICMD with autosense, TD_GETGEOMETRY, TD_EJECT,
  * TD_CHANGESTATE, TD_CHANGENUM, TD_PROTSTATUS, TD_ADDCHANGEINT,
- * TD_REMCHANGEINT, CMD_START, CMD_STOP, NSCMD_DEVICEQUERY, and no-ops for
- * CMD_UPDATE, CMD_CLEAR, TD_MOTOR, TD_REMOVE and CMD_RESET.
+ * TD_REMCHANGEINT, TD_REMOVE, TD_GETNUMTRACKS, CMD_START, CMD_STOP,
+ * NSCMD_DEVICEQUERY, and no-ops for CMD_UPDATE, CMD_CLEAR, TD_MOTOR and
+ * CMD_RESET.
  */
 #include "mc.h"
 
@@ -92,6 +93,8 @@ static LONG sense(struct MC *mc, struct MCUnit *u)
             if (r->io_Data)
                 Cause((struct Interrupt *)r->io_Data);
         }
+        if (u->remove)
+            Cause(u->remove);
     }
     return c.actual >= 3 ? (mc->sense[2] & 0x0F) : -1;
 }
@@ -126,6 +129,18 @@ static LONG scsi(struct MC *mc, struct MCUnit *u, UBYTE *cdb, UWORD cdblen, void
     return err ? err : HFERR_BadStatus;
 }
 
+/* Write protection, for TD_PROTSTATUS: CD-ROM and WORM drives are
+   read-only, disks report it in the MODE SENSE header. */
+static void read_wprot(struct MC *mc, struct MCUnit *u)
+{
+    UBYTE cdb[6] = { 0x1A, 0, 0x3F, 0, 4, 0 }, hdr[4] = { 0, 0, 0, 0 };
+    ULONG actual = 0;
+    if (u->type == 0x05 || u->type == 0x04)
+        u->wprot = 1;
+    else
+        u->wprot = !scsi(mc, u, cdb, 6, hdr, 4, 1, &actual, 0) && actual >= 3 && (hdr[2] & 0x80);
+}
+
 static LONG read_capacity(struct MC *mc, struct MCUnit *u)
 {
     UBYTE cdb[10] = { 0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -141,6 +156,7 @@ static LONG read_capacity(struct MC *mc, struct MCUnit *u)
         return HFERR_BadStatus;         /* odd block size */
     u->shift = shift;
     u->blocks = cap[0] == 0xFFFFFFFFUL ? 0 : cap[0] + 1;
+    read_wprot(mc, u);                  /* a new medium may be protected differently */
     return 0;
 }
 
@@ -259,7 +275,7 @@ static void scsicmd(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     sc->scsi_SenseActual = 0;
     err = esp_exec(mc, u->target, u->lun, &c);
     sc->scsi_Actual = c.actual;
-    sc->scsi_Status = c.status;
+    sc->scsi_Status = err ? 0 : c.status;  /* no status byte without a status phase */
     if (err) {
         ior->io_Error = err;
         return;
@@ -409,6 +425,10 @@ static void perform(struct MC *mc, struct IOStdReq *ior)
         ior->io_Actual = scsi(mc, u, cdb, 6, 0, 0, 0, 0, 0) ? 1 : 0;
         break;
     }
+    case TD_GETNUMTRACKS:               /* tracks of 63 blocks, as TD_GETGEOMETRY reports */
+        if (!(ior->io_Error = read_capacity(mc, u)))
+            ior->io_Actual = (u->blocks ? u->blocks : 0xFFFFFFFFUL) / 63;
+        break;
     case TD_SEEK:
     case ETD_SEEK:
     case TD_SEEK64:
@@ -618,7 +638,7 @@ static ULONG dev_null(void)
 
 static const UWORD cmds[] = {
     CMD_RESET, CMD_READ, CMD_WRITE, CMD_UPDATE, CMD_CLEAR, CMD_STOP, CMD_START,
-    TD_MOTOR, TD_SEEK, TD_FORMAT, TD_REMOVE, TD_CHANGENUM, TD_CHANGESTATE,
+    TD_MOTOR, TD_SEEK, TD_FORMAT, TD_REMOVE, TD_CHANGENUM, TD_CHANGESTATE, TD_GETNUMTRACKS,
     TD_PROTSTATUS, TD_ADDCHANGEINT, TD_REMCHANGEINT, TD_GETGEOMETRY, TD_EJECT,
     ETD_READ, ETD_WRITE, ETD_SEEK, ETD_FORMAT, ETD_UPDATE, ETD_CLEAR, ETD_MOTOR,
     TD_READ64, TD_WRITE64, TD_SEEK64, TD_FORMAT64, HD_SCSICMD,
@@ -646,14 +666,17 @@ static void dev_beginio(struct IOStdReq *ior __asm("a1"), struct MC *mc __asm("a
     case ETD_CLEAR:
     case ETD_MOTOR:
     case TD_MOTOR:
-    case TD_REMOVE:
+        ior->io_Actual = 0;
+        break;
+    case TD_PROTSTATUS:                 /* answered at once, as callers expect */
+        ior->io_Actual = u->wprot;
+        break;
+    case TD_REMOVE:                     /* the old single change interrupt; 0 removes it */
+        u->remove = ior->io_Data;
         ior->io_Actual = 0;
         break;
     case TD_CHANGENUM:
         ior->io_Actual = u->changes;
-        break;
-    case TD_PROTSTATUS:
-        ior->io_Actual = 0;
         break;
     case NSCMD_DEVICEQUERY: {
         struct NSDeviceQueryResult *q = ior->io_Data;
