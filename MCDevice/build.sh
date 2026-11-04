@@ -2,6 +2,13 @@
 # Builds mastercard.device with the Bebbo toolchain and the NDK 3.2 headers.
 cd "$(dirname "$0")" || exit 1
 N=${NDK:-$HOME/amiga/AmigaOS/AmigaOS3.2/NDK3.2}
+# DOCKER=image runs this same script in a toolchain container, for example
+#   DOCKER=stefanreinauer/amiga-gcc:gcc-v16.2 ./build.sh
+if [ -n "$DOCKER" ]; then
+    R=$(cd .. && pwd)
+    exec docker run --rm -u "$(id -u):$(id -g)" -v "$R:/w" -v "$N:/ndk:ro" -e NDK=/ndk \
+        -w /w/MCDevice "$DOCKER" ./build.sh
+fi
 PATH=/opt/amiga/bin:$PATH
 mkdir -p gen
 python3 ../MTecPatch/gen/genstubs.py "$N" \
@@ -15,7 +22,7 @@ python3 ../MTecPatch/gen/genstubs.py "$N" \
 for V in "mastercard.device:" "mastercard-irq.device:-DIRQXFER"; do
     m68k-amigaos-gcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
         -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-pointer-sign -Wno-array-bounds \
-        ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o ${V%%:*} dev.c esp.c || exit 1
+        -s ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o ${V%%:*} dev.c esp.c || exit 1
 done
 ls -l mastercard.device mastercard-irq.device
 # The boot ROM, in both variants: rom/MCROM[-irq]-16k.bin for the emulator,
