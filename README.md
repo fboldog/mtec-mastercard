@@ -455,8 +455,6 @@ Not done yet:
 - disks with other block sizes and LUNs above 0 at boot
 - disconnection
 - detecting medium changes without a command
-- a test on the real card. The 8-byte mode and `$D039` aren't modelled by the
-  emulator.
 
 ## Building
 
