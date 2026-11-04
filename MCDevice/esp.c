@@ -131,7 +131,9 @@ void esp_busreset(struct MC *mc)
 /* The DMA16 inner loops, in assembly for speed. Each moves 16 bytes each
    time the flag is set, until bursts is 0 (at most 4096, one 64 KB chunk),
    the chip interrupts (the target stopped early) or limit polls pass
-   without the flag. The card's port answers at $F000-$F00F, emulators only
+   without the flag. While waiting, the flag is tested 8 times before the
+   chip's status is: each test is a slow card access, and the original
+   driver gains its speed this way. The card's port answers at $F000-$F00F, emulators only
    to $F007; reading with movem.l was no faster on the card (run 5). */
 struct Fast {
     volatile UBYTE *flag;
@@ -158,6 +160,20 @@ __asm(
 "  beq.s 9f\n"
 "  1:move.l d1,d2\n"
 "  2:tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
 "  bmi.s 3f\n"
 "  tst.b (a5)\n"
 "  bmi.s 9f\n"
@@ -189,6 +205,20 @@ __asm(
 "  1:move.l d1,d2\n"
 "  2:tst.b (a2)\n"
 "  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
 "  tst.b (a5)\n"
 "  bmi.s 9f\n"
 "  subq.l #1,d2\n"
@@ -218,6 +248,20 @@ __asm(
 "  beq.s 9f\n"
 "  1:move.l d1,d2\n"
 "  2:tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
 "  bmi.s 3f\n"
 "  tst.b (a5)\n"
 "  bmi.s 9f\n"
@@ -252,6 +296,20 @@ __asm(
 "  beq.s 9f\n"
 "  1:move.l d1,d2\n"
 "  2:tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
 "  bmi.s 3f\n"
 "  tst.b (a5)\n"
 "  bmi.s 9f\n"
@@ -306,7 +364,7 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
         f.buf = p;
         f.bursts = left >> sh;
         f.stat = &REG(mc, R_STAT);
-        f.limit = SPIN_LIMIT;
+        f.limit = SPIN_LIMIT / 8;      /* 8 flag tests per round */
         if (!in)
             fast16_out(&f);
         else if (c->mode == MCMODE_DMA32)

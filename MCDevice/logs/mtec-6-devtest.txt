@@ -1,0 +1,9 @@
+Test mtecscsi.device 1 with Zorro II RAM
+read  512 KB xfers          6024 KB/sec (13% CPU)
+read  128 KB xfers          5796 KB/sec (20% CPU)
+read   32 KB xfers          4964 KB/sec (2% CPU)
+OpenDevice / CloseDevice    0.009 ms
+OpenDevice multiple         0.008 ms
+CloseDevice multiple        0.002 ms
+TD_GETGEOMETRY sequential     Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD0.007 ms
+TD_GETGEOMETRY parallel     0.005 ms
