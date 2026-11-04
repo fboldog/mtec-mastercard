@@ -316,6 +316,50 @@ Results in Amiberry, on a card whose ROM has the DiagArea flag cleared:
   4 GB, and up to 5 GB. A check on the host found every pattern at its exact byte
   offset.
 
+#### DMA test disk for the real card
+
+`MCDevice/mkadf.sh` builds `MCTest.adf`: `mastercard.device`, `MCDiag`, devtest
+and a startup script. It runs with the original EPROM still in.
+
+`MCDiag TAKEOVER` first takes the card from the M-Tec driver:
+1. It freezes the driver's process while it waits. The driver otherwise polls
+   the units every 0.5 s.
+2. It removes the driver's interrupt server.
+3. It makes the driver's BeginIO fail every request and renames it.
+
+The hard disk can't be used again until a reboot.
+
+Then, for each unit, every test runs in each transfer mode:
+
+| Mode | How the data moves |
+|---|---|
+| `DMA16` | 16 bytes for each `$C039` flag, then words. The driver's normal mode, and the reference |
+| `DMA8` | 8 bytes for each `$C839` flag, then words |
+| `WORD` | one word for each `$D039` flag |
+| `PIO` | the chip's FIFO, without the board's DMA logic |
+
+The tests:
+- **INQUIRY, REQUEST SENSE and MODE SENSE**, with odd and even lengths.
+- **Reads:** of 1, 8 and 128 blocks, of 64 KB + 1 block (two DMA chunks), of the
+  last block, and into buffers 1, 2 and 3 bytes off a word boundary.
+- **WRITE BUFFER / READ BUFFER:** every write mode against every read mode. This
+  checks both directions against a known pattern and only touches the drive's
+  own buffer.
+
+Each line shows what the data port did:
+- bursts, word moves and bytes through the chip FIFO
+- how many DMA or PIO commands it took
+- the longest wait
+- the flags and chip registers at the end
+
+The defaults only read the disk. `Execute S:write-test` adds disk writes 300
+blocks before the end: each block is saved, written in every mode, read back,
+checked, and restored.
+
+In Amiberry, with the original ROM and the takeover, DMA16 and WORD pass every
+read and write test. The emulator models neither `$C839` nor the chip's PIO
+transfers, so `NODMA8` and `NOPIO` leave those modes out there.
+
 Not done yet:
 - the boot ROM: our own loader, RDB mounting and booting
 - disconnection

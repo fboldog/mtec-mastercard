@@ -15,7 +15,7 @@
 #include "gen/stubs.h"
 
 #define REG(mc, n) ((mc)->board[MC_REGS + ((n) << 3)])
-#define SPIN_LIMIT 0x00800000UL     /* polls before a data phase gives up, some seconds */
+#define SPIN_LIMIT 0x00080000UL     /* polls without progress before a DMA chunk gives up, ~0.5 s */
 #define MAX_PHASES 64
 
 static inline void wr(struct MC *mc, int n, UBYTE v) { REG(mc, n) = v; }
@@ -23,11 +23,37 @@ static inline UBYTE rd(struct MC *mc, int n) { return REG(mc, n); }
 
 /* Interrupt server, called with is_Data in a1. Returns non-zero if the
    interrupt was the chip's. The asm entry turns that into the Z flag. */
+/* Reads and drops words while the board says it holds data, at most n. */
+static ULONG drain(struct MC *mc, ULONG n)
+{
+    volatile UWORD *pw = (volatile UWORD *)(mc->board + MC_PORT);
+    ULONG k = 0;
+    while (k < n && ((mc->board[MC_DREQW] | mc->board[MC_DREQ16]) & 0x80)) {
+        (void)*pw;
+        k++;
+    }
+    return k;
+}
+
 LONG mc_irq(struct MC *mc __asm("a1"))
 {
     UBYTE st = rd(mc, R_STAT);
-    if (!(st & ST_INT))
+    if (!(st & ST_INT)) {
+        /* The board raises INT2 while it holds data. Outside a transfer
+           nobody would move it and INT2 would never clear: drop it, and
+           reset the chip if that isn't enough. */
+        if ((mc->board[MC_DREQW] | mc->board[MC_DREQ16]) & 0x80) {
+            mc->stray++;
+            drain(mc, 4096);
+            if ((mc->board[MC_DREQW] | mc->board[MC_DREQ16]) & 0x80) {
+                wr(mc, R_CMD, C_RESET);
+                wr(mc, R_CMD, C_NOP);
+                (void)rd(mc, R_INTR);
+            }
+            return 1;
+        }
         return 0;
+    }
     mc->istat = st;
     mc->iseq = rd(mc, R_SEQ);
     mc->iintr = rd(mc, R_INTR);         /* reading this clears the interrupt */
@@ -95,95 +121,283 @@ void esp_busreset(struct MC *mc)
     mc_delay(mc, 2000000);              /* let the devices come back */
 }
 
+/* The DMA16 inner loops, in assembly for speed. Each moves 16 bytes each
+   time the flag is set, until bursts is 0, the chip interrupts (the target
+   stopped early) or limit polls pass without the flag. */
+struct Fast {
+    volatile UBYTE *flag;
+    volatile ULONG *port;
+    void *buf;
+    ULONG bursts;
+    volatile UBYTE *stat;
+    ULONG limit;
+};
+void fast16_in(struct Fast *f __asm("a0"));
+void fast16_out(struct Fast *f __asm("a0"));
+__asm(
+"  .text\n"
+"  .globl _fast16_in\n"
+"_fast16_in:\n"
+"  movem.l d2/a2-a5,-(sp)\n"
+"  movem.l (a0),a2-a4\n"             /* flag, port, buf */
+"  move.l 12(a0),d0\n"              /* bursts */
+"  movea.l 16(a0),a5\n"             /* chip status */
+"  move.l 20(a0),d1\n"              /* limit */
+"  tst.l d0\n"
+"  beq.s 9f\n"
+"1:move.l d1,d2\n"
+"2:tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a5)\n"
+"  bmi.s 9f\n"
+"  subq.l #1,d2\n"
+"  bne.s 2b\n"
+"  bra.s 9f\n"
+"3:move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  subq.l #1,d0\n"
+"  beq.s 9f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3b\n"
+"  bra.s 1b\n"
+"9:move.l a4,8(a0)\n"
+"  move.l d0,12(a0)\n"
+"  movem.l (sp)+,d2/a2-a5\n"
+"  rts\n"
+"  .globl _fast16_out\n"
+"_fast16_out:\n"
+"  movem.l d2/a2-a5,-(sp)\n"
+"  movem.l (a0),a2-a4\n"
+"  move.l 12(a0),d0\n"
+"  movea.l 16(a0),a5\n"
+"  move.l 20(a0),d1\n"
+"  tst.l d0\n"
+"  beq.s 9f\n"
+"1:move.l d1,d2\n"
+"2:tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a5)\n"
+"  bmi.s 9f\n"
+"  subq.l #1,d2\n"
+"  bne.s 2b\n"
+"  bra.s 9f\n"
+"3:move.l (a4)+,(a3)\n"
+"  move.l (a4)+,(a3)\n"
+"  move.l (a4)+,(a3)\n"
+"  move.l (a4)+,(a3)\n"
+"  subq.l #1,d0\n"
+"  beq.s 9f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3b\n"
+"  bra.s 1b\n"
+"9:move.l a4,8(a0)\n"
+"  move.l d0,12(a0)\n"
+"  movem.l (sp)+,d2/a2-a5\n"
+"  rts\n");
+
 /* Moves one DMA chunk of a data phase. Runs disabled; ends at the chip's
-   interrupt, whose registers it latches like mc_irq would. */
-static LONG data_phase(struct MC *mc, struct Cmd *c)
+   interrupt, whose registers it latches like mc_irq would.
+   MCMODE_DMA16: 16 bytes each time $C039 says so, then words.
+   MCMODE_DMA8:  8 bytes each time $C839 says so, then words.
+   MCMODE_WORD:  one word each time $D039 says so. */
+static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
 {
-    volatile UBYTE *dreq16 = mc->board + MC_DREQ16, *dreqw = mc->board + MC_DREQW;
+    volatile UBYTE *dreqb = mc->board + (c->mode == MCMODE_DMA8 ? MC_DREQ8 : MC_DREQ16);
+    volatile UBYTE *dreqw = mc->board + MC_DREQW;
     volatile ULONG *pl = (volatile ULONG *)(mc->board + MC_PORT);
     volatile UWORD *pw = (volatile UWORD *)(mc->board + MC_PORT);
+    ULONG burst = c->mode == MCMODE_DMA8 ? 8 : c->mode == MCMODE_WORD ? 0x7FFFFFFF : 16;
     ULONG left = c->len - c->actual, n, spin = 0;
-    UBYTE *p = c->data + c->actual, st;
+    UBYTE *p = c->data + c->actual, st_ = 0;
+    UBYTE in = c->in;
 
-    if (!left)
-        return HFERR_Phase;             /* the target wants more than we have */
     n = left > 0x10000 ? 0x10000 : left;
     left = n;
     wr(mc, R_TCLO, n);
     wr(mc, R_TCMID, n >> 8);            /* 0 for 64 KB */
+    st->chunks++;
     Disable();
     wr(mc, R_CMD, C_DMA | C_TI);
-    if (c->in) {
-        for (;;) {
-            if (left >= 16 && (*dreq16 & 0x80)) {
-                ULONG *q = (ULONG *)p;
-                q[0] = *pl; q[1] = *pl; q[2] = *pl; q[3] = *pl;
-                p += 16; left -= 16;
-                spin = 0;
-                continue;
-            }
-            if (left >= 2 && left < 16 && ((*dreq16 | *dreqw) & 0x80)) {
-                *(UWORD *)p = *pw;
-                p += 2; left -= 2;
-                spin = 0;
-                continue;
-            }
-            if ((st = rd(mc, R_STAT)) & ST_INT)
-                break;
-            if (++spin > SPIN_LIMIT)
-                break;
-        }
-    } else {
-        for (;;) {
-            if (left >= 16 && (*dreq16 & 0x80)) {
-                ULONG *q = (ULONG *)p;
-                *pl = q[0]; *pl = q[1]; *pl = q[2]; *pl = q[3];
-                p += 16; left -= 16;
-                spin = 0;
-                continue;
-            }
-            if (left >= 2 && left < 16 && ((*dreq16 | *dreqw) & 0x80)) {
-                *pw = *(UWORD *)p;
-                p += 2; left -= 2;
-                spin = 0;
-                continue;
-            }
-            if ((st = rd(mc, R_STAT)) & ST_INT)
-                break;
-            if (++spin > SPIN_LIMIT)
-                break;
-        }
+    if (c->mode == MCMODE_DMA16 && left >= 16) {
+        /* The bulk of it in assembly: 16 bytes per flag, like the original. */
+        struct Fast f;
+        f.flag = dreqb;
+        f.port = pl;
+        f.buf = p;
+        f.bursts = left >> 4;
+        f.stat = &REG(mc, R_STAT);
+        f.limit = SPIN_LIMIT;
+        if (in)
+            fast16_in(&f);
+        else
+            fast16_out(&f);
+        st->bursts += (left >> 4) - f.bursts;
+        left -= (UBYTE *)f.buf - p;
+        p = (UBYTE *)f.buf;
     }
-    if (!(st & ST_INT)) {
+    for (;;) {
+        if (left >= burst && (*dreqb & 0x80)) {
+            ULONG *q = (ULONG *)p;
+            if (in) {
+                q[0] = *pl; q[1] = *pl;
+                if (burst == 16) { q[2] = *pl; q[3] = *pl; }
+            } else {
+                *pl = q[0]; *pl = q[1];
+                if (burst == 16) { *pl = q[2]; *pl = q[3]; }
+            }
+            p += burst; left -= burst;
+            st->bursts++;
+        } else if (left >= 2 && (left < burst || burst > 16) &&
+                   ((burst > 16 ? 0 : *dreqb) | *dreqw) & 0x80) {
+            if (in)
+                *(UWORD *)p = *pw;
+            else
+                *pw = *(UWORD *)p;
+            p += 2; left -= 2;
+            st->words++;
+        } else if (left == 1 && ((burst > 16 ? 0 : *dreqb) | *dreqw) & 0x80) {
+            /* The last byte of an odd length: the board moves words, and the
+               chip waits until the whole word is taken. The byte is the high
+               half. */
+            if (in)
+                *p = *pw >> 8;
+            else
+                *pw = (UWORD)*p << 8;
+            p++; left = 0;
+            st->words++;
+        } else {
+            if ((st_ = rd(mc, R_STAT)) & ST_INT)
+                break;
+            if (++spin > SPIN_LIMIT)
+                break;
+            continue;
+        }
+        if (spin > st->maxpolls)
+            st->maxpolls = spin;
+        spin = 0;
+    }
+    st->dreq16 = mc->board[MC_DREQ16];
+    st->dreq8 = mc->board[MC_DREQ8];
+    st->dreqw = *dreqw;
+    if (!(st_ & ST_INT)) {
+        /* The data port never answered. A pending DMA request holds INT2,
+           which nothing would clear once interrupts are on again, so the
+           chip is reset first; the caller resets the bus. */
+        st->stat = rd(mc, R_STAT);
+        st->fflags = rd(mc, R_FFLAGS);
+        wr(mc, R_CMD, C_RESET);
+        wr(mc, R_CMD, C_NOP);
+        (void)rd(mc, R_INTR);
         Enable();
         return HFERR_DMA;
     }
-    mc->istat = st;
+    /* The chip is done; the board may still hold the last words of a read,
+       as when the target sent less than asked. Move them while there is
+       room, then drop the rest, as the original driver does. */
+    if (in) {
+        while (((*dreqw | *dreqb) & 0x80) && left) {
+            UWORD w = *pw;
+            if (left >= 2) {
+                *(UWORD *)p = w;
+                p += 2; left -= 2;
+            } else {
+                *p++ = w >> 8;
+                left = 0;
+            }
+            st->words++;
+        }
+        st->drained += drain(mc, 4096);
+    }
+    mc->istat = st_;
     mc->iseq = rd(mc, R_SEQ);
     {
         /* What the chip moved on the bus: n minus the transfer counter. */
         ULONG rest = rd(mc, R_TCLO) | (ULONG)rd(mc, R_TCMID) << 8;
         UBYTE fifo = rd(mc, R_FFLAGS) & 0x1F;
         ULONG moved;
-        if (st & ST_TC)
-            rest = 0;                   /* all of it */
-        else if (!rest && n == 0x10000)
-            rest = n;                   /* 64 KB loaded as 0, none of it moved */
+        st->fflags = fifo;
+        st->tcleft = rest;
+        /* The counter is what counts; the TC bit is only checked for 64 KB,
+           which loads as 0. (Emulators set the TC bit too early.) */
+        if (!rest && n == 0x10000 && !(st_ & ST_TC))
+            rest = n;                   /* none of it moved */
         moved = n - rest;
-        if (c->in) {
+        if (in) {
             /* A last odd byte stays in the chip's FIFO. */
-            while (fifo-- && p < c->data + c->actual + moved)
+            while (fifo-- && p < c->data + c->actual + moved) {
                 *p++ = rd(mc, R_FIFO);
+                st->fifo++;
+            }
         } else if (fifo) {
             moved -= fifo;              /* sent to the FIFO, not taken by the target */
+            st->fifo += fifo;
             wr(mc, R_CMD, C_FLUSH);
         }
         c->actual += moved;
     }
     mc->iintr = rd(mc, R_INTR);
+    st->stat = st_;
+    st->intr = mc->iintr;
+    st->seq = mc->iseq;
     mc->ipending = 1;
     Enable();
     return 0;
+}
+
+/* The data phase through the chip's FIFO, without DMA: Transfer Information
+   moves what fits in the FIFO, the chip interrupts, the CPU empties or fills
+   it, and again until the target changes phase. Interrupts stay on. */
+static LONG pio_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
+{
+    UBYTE want = c->in ? PH_DATAIN : PH_DATAOUT;
+    while ((mc->istat & ST_PHASE) == want && c->actual < c->len) {
+        ULONG left = c->len - c->actual;
+        UBYTE k = left > 16 ? 16 : left, j, fifo;
+        if (!c->in) {
+            wr(mc, R_CMD, C_FLUSH);
+            for (j = 0; j < k; j++)
+                wr(mc, R_FIFO, c->data[c->actual + j]);
+        }
+        st->chunks++;
+        wr(mc, R_CMD, C_TI);
+        if (!wait_int(mc, 5))
+            return HFERR_Phase;
+        fifo = rd(mc, R_FFLAGS) & 0x1F;
+        st->fflags = fifo;
+        if (c->in) {
+            while (fifo-- && c->actual < c->len) {
+                c->data[c->actual++] = rd(mc, R_FIFO);
+                st->fifo++;
+            }
+        } else {
+            c->actual += k - fifo;      /* what the target took */
+            st->fifo += k;
+        }
+        st->stat = mc->istat;
+        st->intr = mc->iintr;
+        st->seq = mc->iseq;
+        if (mc->iintr & IN_DISC)
+            break;
+    }
+    if (c->in) {                        /* bytes left in the FIFO at the phase change */
+        UBYTE fifo = rd(mc, R_FFLAGS) & 0x1F;
+        while (fifo-- && c->actual < c->len) {
+            c->data[c->actual++] = rd(mc, R_FIFO);
+            st->fifo++;
+        }
+    }
+    mc->ipending = 1;                   /* esp_exec goes on from the latched registers */
+    return 0;
+}
+
+static LONG data_phase(struct MC *mc, struct Cmd *c)
+{
+    struct MCStats dummy, *st = c->st ? c->st : &dummy;
+    if (c->actual >= c->len)
+        return HFERR_Phase;             /* the target wants more than we have */
+    return c->mode == MCMODE_PIO ? pio_phase(mc, c, st) : dma_phase(mc, c, st);
 }
 
 LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)

@@ -23,6 +23,7 @@
 #include <exec/lists.h>
 #include <devices/timer.h>
 #include <dos/dos.h>
+#include "mcdiag.h"
 
 static inline void NewList(struct List *l)
 {
@@ -125,6 +126,7 @@ struct MC {
     UBYTE pad2;
     struct MCUnit *units[MAX_TARGET * MAX_LUN];
     UBYTE sense[32];
+    ULONG stray;                /* board requests nobody was moving */
 };
 
 /* One SCSI command, as esp_exec runs it. */
@@ -136,6 +138,8 @@ struct Cmd {
     UBYTE *data;
     ULONG len;
     ULONG actual;
+    UBYTE mode;             /* MCMODE_, 0 is the normal DMA */
+    struct MCStats *st;     /* counters for MCDiag, or 0 */
 };
 
 void esp_init(struct MC *mc);

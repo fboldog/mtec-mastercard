@@ -1,0 +1,6 @@
+; Disk write tests on every disk: 300 blocks before the end, each block is
+; saved, written with every mode, read back, checked and restored.
+; For another place: MCDiag TAKEOVER WRITE UNIT n LBA n LOG DF0:mcdiag-write.log
+FailAt 21
+MCDiag TAKEOVER WRITE LOG DF0:mcdiag-write.log
+Echo "The log is DF0:mcdiag-write.log"

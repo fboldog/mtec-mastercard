@@ -1,0 +1,704 @@
+MCDiag 0.1 - data port tests for mastercard.device
+TAKEOVER: no mtecscsi.device running, nothing to do
+Opening unit 0 (loads the driver: chip and bus reset, 2-3 s)
+Opening unit 1
+Unit 1 open, INQUIRY with DMA16
+
+== Unit 1: type 0  QUANTUM  BlueSCSI Pico    1.0 
+-- INQUIRY 36
+INQUIRY 36         DMA16 ok      36/36    s00 b2 w2 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+INQUIRY 36         DMA8  same    36/36    s00 b4 w2 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+INQUIRY 36         WORD  same    36/36    s00 b0 w18 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+INQUIRY 36         PIO   same    36/36    s00 b0 w0 f36 c36 p0 tc0 [00 00 00] st93 in10 sqC4 ff01 d0 x0
+-- INQUIRY 37
+INQUIRY 37         DMA16 ERR 41 0/37 sFF b2 w2 f0 c1 p1 tc0 [39 39 B9] st13 in00 sq00 ff81 d0 x0
+-- INQUIRY 255
+INQUIRY 255        DMA16 ERR 41 0/255 sFF b15 w7 f0 c1 p1 tc0 [39 39 B9] st13 in00 sq00 ff81 d0 x0
+-- REQUEST SENSE 18
+REQUEST SENSE 18   DMA16 ok      18/18    s00 b1 w1 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+REQUEST SENSE 18   DMA8  same    18/18    s00 b2 w1 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+REQUEST SENSE 18   WORD  same    18/18    s00 b0 w9 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+REQUEST SENSE 18   PIO   same    18/18    s00 b0 w0 f18 c18 p0 tc0 [00 00 00] st93 in10 sqC4 ff01 d0 x0
+-- MODE SENSE 255
+MODE SENSE 255     DMA16 ok     208/255   s00 b13 w0 f0 c1 p1 tc2F [39 39 39] st83 in10 sqC4 ff00 d0 x0
+MODE SENSE 255     DMA8  same   208/255   s00 b26 w0 f0 c1 p1 tc2F [39 39 39] st83 in10 sqC4 ff00 d0 x0
+MODE SENSE 255     WORD  same   208/255   s00 b0 w104 f0 c1 p0 tc2F [39 39 39] st83 in10 sqC4 ff00 d0 x0
+MODE SENSE 255     PIO   same   208/255   s00 b0 w0 f208 c208 p0 tc0 [00 00 00] st83 in10 sqC4 ff01 d0 x0
+Medium: 15712256 blocks of 512 bytes
+-- READ 1
+READ 1             DMA16 ok     512/512   s00 b32 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 1             DMA8  same   512/512   s00 b64 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 1             WORD  same   512/512   s00 b0 w256 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 1             PIO   same   512/512   s00 b0 w0 f512 c512 p0 tc0 [00 00 00] st93 in10 sqC4 ff01 d0 x0
+-- READ 8
+READ 8             DMA16 ok    4096/4096  s00 b256 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 8             DMA8  same  4096/4096  s00 b512 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 8             WORD  same  4096/4096  s00 b0 w2048 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 8             PIO   same  4096/4096  s00 b0 w0 f4096 c4096 p0 tc0 [00 00 00] st93 in10 sqC4 ff01 d0 x0
+-- READ 64K
+READ 64K           DMA16 ok   65536/65536 s00 b4096 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K           DMA8  same 65536/65536 s00 b8192 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K           WORD  same 65536/65536 s00 b0 w32768 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+-- READ 64K+1 block
+READ 64K+1 block   DMA16 ok   66048/66048 s00 b4128 w0 f0 c2 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K+1 block   DMA8  same 66048/66048 s00 b8256 w0 f0 c2 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K+1 block   WORD  same 66048/66048 s00 b0 w33024 f0 c2 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+-- READ last block
+READ last block    DMA16 ok     512/512   s00 b32 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ last block    DMA8  same   512/512   s00 b64 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ last block    WORD  same   512/512   s00 b0 w256 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ last block    PIO   same   512/512   s00 b0 w0 f512 c512 p0 tc0 [00 00 00] st93 in10 sqC4 ff01 d0 x0
+-- READ 8 buf+1
+READ 8 buf+1       DMA16 ok    4096/4096  s00 b256 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 8 buf+1       DMA8  same  4096/4096  s00 b512 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 8 buf+1       WORD  same  4096/4096  s00 b0 w2048 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 8 buf+1       PIO   same  4096/4096  s00 b0 w0 f4096 c4096 p0 tc0 [00 00 00] st93 in10 sqC4 ff01 d0 x0
+-- READ 8 buf+2
+READ 8 buf+2       DMA16 ok    4096/4096  s00 b256 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 8 buf+2       DMA8  same  4096/4096  s00 b512 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 8 buf+2       WORD  same  4096/4096  s00 b0 w2048 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 8 buf+2       PIO   same  4096/4096  s00 b0 w0 f4096 c4096 p0 tc0 [00 00 00] st93 in10 sqC4 ff01 d0 x0
+-- READ 8 buf+3
+READ 8 buf+3       DMA16 ok    4096/4096  s00 b256 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 8 buf+3       DMA8  same  4096/4096  s00 b512 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 8 buf+3       WORD  same  4096/4096  s00 b0 w2048 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 8 buf+3       PIO   same  4096/4096  s00 b0 w0 f4096 c4096 p0 tc0 [00 00 00] st93 in10 sqC4 ff01 d0 x0
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b4096 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    WORD  same 65536/65536 s00 b0 w32768 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b4096 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    WORD  same 65536/65536 s00 b0 w32768 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b4096 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    WORD  same 65536/65536 s00 b0 w32768 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b4096 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    WORD  same 65536/65536 s00 b0 w32768 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b4096 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    WORD  same 65536/65536 s00 b0 w32768 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b4096 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    WORD  same 65536/65536 s00 b0 w32768 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b4096 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    WORD  same 65536/65536 s00 b0 w32768 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b4096 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 w0 f0 c1 p1 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+READ 64K spread    WORD  same 65536/65536 s00 b0 w32768 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE/READ BUFFER  the drive's buffer is 65532 bytes
+BUFFER 001         DMA16>DMA16 FAIL e41 w0/sFF r0/sFF len 1 @0 5A!=20
+  write: b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+BUFFER 001         DMA16>DMA8  FAIL e41 w0/sFF r0/sFF len 1 @0 5A!=3F
+  write: b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+BUFFER 001         DMA16>WORD  FAIL e41 w0/sFF r0/sFF len 1 @0 5A!=5E
+  write: b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+BUFFER 001         DMA16>PIO   FAIL e41 w0/sFF r0/sFF len 1 @0 5A!=7D
+  write: b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+BUFFER 001         DMA8 >DMA16 FAIL e41 w0/sFF r0/sFF len 1 @0 5A!=9C
+  write: b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+BUFFER 001         DMA8 >DMA8  FAIL e41 w0/sFF r0/sFF len 1 @0 5A!=BB
+  write: b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+BUFFER 001         DMA8 >WORD  FAIL e41 w0/sFF r0/sFF len 1 @0 5A!=DA
+  write: b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+BUFFER 001         DMA8 >PIO   FAIL e41 w0/sFF r0/sFF len 1 @0 5A!=F9
+  write: b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+BUFFER 001         WORD >DMA16 FAIL e41 w0/sFF r0/sFF len 1 @0 5A!=18
+  write: b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+BUFFER 001         WORD >DMA8  FAIL e41 w0/sFF r0/sFF len 1 @0 5A!=37
+  write: b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+BUFFER 001         WORD >WORD  FAIL e41 w0/sFF r0/sFF len 1 @0 5A!=56
+  write: b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+BUFFER 001         WORD >PIO   FAIL e41 w0/sFF r0/sFF len 1 @0 5A!=75
+  write: b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [B9 B9 B9] st00 in00 sq00 ff80 d0 x0
+BUFFER 001         PIO  >DMA16 FAIL e41 w1/s00 r0/sFF len 1 @0 5A!=94
+  write: b0 w0 f1 c1 p0 tc0 [00 00 00] st83 in10 sqC4 ff00 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [39 39 B9] st13 in00 sq00 ff81 d0 x0
+BUFFER 001         PIO  >DMA8  FAIL e41 w1/s00 r0/sFF len 1 @0 5A!=B3
+  write: b0 w0 f1 c1 p0 tc0 [00 00 00] st83 in10 sqC4 ff00 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [39 39 B9] st13 in00 sq00 ff81 d0 x0
+BUFFER 001         PIO  >WORD  FAIL e41 w1/s00 r0/sFF len 1 @0 5A!=D2
+  write: b0 w0 f1 c1 p0 tc0 [00 00 00] st83 in10 sqC4 ff00 d0 x0
+  read:  b0 w0 f0 c1 p0 tc0 [39 39 B9] st13 in00 sq00 ff81 d0 x0
+BUFFER 001         PIO  >PIO   FAIL e0 w1/s00 r1/s00 len 1 @0 00!=F1
+  write: b0 w0 f1 c1 p0 tc0 [00 00 00] st83 in10 sqC4 ff00 d0 x0
+  read:  b0 w0 f1 c1 p0 tc0 [00 00 00] st83 in10 sqC4 ff01 d0 x0
+BUFFER 002         DMA16>DMA16 FAIL e0 w2/s00 r0/s02 len 2 @0 5A!=3F
+  write: b0 w1 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         DMA16>DMA8  FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=5E
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         DMA16>WORD  FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=7D
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         DMA16>PIO   FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=9C
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         DMA8 >DMA16 FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=BB
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         DMA8 >DMA8  FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=DA
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         DMA8 >WORD  FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=F9
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         DMA8 >PIO   FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=18
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         WORD >DMA16 FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=37
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         WORD >DMA8  FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=56
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         WORD >WORD  FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=75
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         WORD >PIO   FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=94
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         PIO  >DMA16 FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=B3
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         PIO  >DMA8  FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=D2
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         PIO  >WORD  FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=F1
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 002         PIO  >PIO   FAIL e0 w0/s02 r0/s02 len 2 @0 5A!=10
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         DMA16>DMA16 FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=5E
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         DMA16>DMA8  FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=7D
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         DMA16>WORD  FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=9C
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         DMA16>PIO   FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=BB
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         DMA8 >DMA16 FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=DA
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         DMA8 >DMA8  FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=F9
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         DMA8 >WORD  FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=18
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         DMA8 >PIO   FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=37
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         WORD >DMA16 FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=56
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         WORD >DMA8  FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=75
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         WORD >WORD  FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=94
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         WORD >PIO   FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=B3
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         PIO  >DMA16 FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=D2
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         PIO  >DMA8  FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=F1
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         PIO  >WORD  FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=10
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 003         PIO  >PIO   FAIL e0 w0/s02 r0/s02 len 3 @0 5A!=2F
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         DMA16>DMA16 FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=7D
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         DMA16>DMA8  FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=9C
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         DMA16>WORD  FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=BB
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         DMA16>PIO   FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=DA
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         DMA8 >DMA16 FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=F9
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         DMA8 >DMA8  FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=18
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         DMA8 >WORD  FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=37
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         DMA8 >PIO   FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=56
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         WORD >DMA16 FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=75
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         WORD >DMA8  FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=94
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         WORD >WORD  FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=B3
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         WORD >PIO   FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=D2
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         PIO  >DMA16 FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=F1
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         PIO  >DMA8  FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=10
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         PIO  >WORD  FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=2F
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 004         PIO  >PIO   FAIL e0 w0/s02 r0/s02 len 4 @0 5A!=4E
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         DMA16>DMA16 FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=D2
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         DMA16>DMA8  FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=F1
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         DMA16>WORD  FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=10
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         DMA16>PIO   FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=2F
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         DMA8 >DMA16 FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=4E
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         DMA8 >DMA8  FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=6D
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         DMA8 >WORD  FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=8C
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         DMA8 >PIO   FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=AB
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         WORD >DMA16 FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=CA
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         WORD >DMA8  FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=E9
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         WORD >WORD  FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=08
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         WORD >PIO   FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=27
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         PIO  >DMA16 FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=46
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         PIO  >DMA8  FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=65
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         PIO  >WORD  FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=84
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 015         PIO  >PIO   FAIL e0 w0/s02 r0/s02 len 15 @0 5A!=A3
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         DMA16>DMA16 FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=F1
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         DMA16>DMA8  FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=10
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         DMA16>WORD  FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=2F
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         DMA16>PIO   FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=4E
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         DMA8 >DMA16 FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=6D
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         DMA8 >DMA8  FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=8C
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         DMA8 >WORD  FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=AB
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         DMA8 >PIO   FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=CA
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         WORD >DMA16 FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=E9
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         WORD >DMA8  FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=08
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         WORD >WORD  FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=27
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         WORD >PIO   FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=46
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         PIO  >DMA16 FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=65
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         PIO  >DMA8  FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=84
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         PIO  >WORD  FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=A3
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 016         PIO  >PIO   FAIL e0 w0/s02 r0/s02 len 16 @0 5A!=C2
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         DMA16>DMA16 FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=10
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         DMA16>DMA8  FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=2F
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         DMA16>WORD  FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=4E
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         DMA16>PIO   FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=6D
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         DMA8 >DMA16 FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=8C
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         DMA8 >DMA8  FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=AB
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         DMA8 >WORD  FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=CA
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         DMA8 >PIO   FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=E9
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         WORD >DMA16 FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=08
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         WORD >DMA8  FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=27
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         WORD >WORD  FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=46
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         WORD >PIO   FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=65
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         PIO  >DMA16 FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=84
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         PIO  >DMA8  FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=A3
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         PIO  >WORD  FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=C2
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 017         PIO  >PIO   FAIL e0 w0/s02 r0/s02 len 17 @0 5A!=E1
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         DMA16>DMA16 FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=2F
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         DMA16>DMA8  FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=4E
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         DMA16>WORD  FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=6D
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         DMA16>PIO   FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=8C
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         DMA8 >DMA16 FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=AB
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         DMA8 >DMA8  FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=CA
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         DMA8 >WORD  FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=E9
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         DMA8 >PIO   FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=08
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         WORD >DMA16 FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=27
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         WORD >DMA8  FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=46
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         WORD >WORD  FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=65
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         WORD >PIO   FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=84
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         PIO  >DMA16 FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=A3
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         PIO  >DMA8  FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=C2
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         PIO  >WORD  FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=E1
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 018         PIO  >PIO   FAIL e0 w0/s02 r0/s02 len 18 @0 5A!=00
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         DMA16>DMA16 FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=C2
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         DMA16>DMA8  FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=E1
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         DMA16>WORD  FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=00
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         DMA16>PIO   FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=1F
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         DMA8 >DMA16 FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=3E
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         DMA8 >DMA8  FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=5D
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         DMA8 >WORD  FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=7C
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         DMA8 >PIO   FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=9B
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         WORD >DMA16 FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=BA
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         WORD >DMA8  FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=D9
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         WORD >WORD  FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=F8
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         WORD >PIO   FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=17
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         PIO  >DMA16 FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=36
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         PIO  >DMA8  FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=55
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         PIO  >WORD  FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=74
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 031         PIO  >PIO   FAIL e0 w0/s02 r0/s02 len 31 @0 5A!=93
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         DMA16>DMA16 FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=00
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         DMA16>DMA8  FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=1F
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         DMA16>WORD  FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=3E
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         DMA16>PIO   FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=5D
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         DMA8 >DMA16 FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=7C
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         DMA8 >DMA8  FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=9B
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         DMA8 >WORD  FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=BA
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         DMA8 >PIO   FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=D9
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         WORD >DMA16 FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=F8
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         WORD >DMA8  FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=17
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         WORD >WORD  FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=36
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         WORD >PIO   FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=55
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         PIO  >DMA16 FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=74
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         PIO  >DMA8  FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=93
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         PIO  >WORD  FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=B2
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 033         PIO  >PIO   FAIL e0 w0/s02 r0/s02 len 33 @0 5A!=D1
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         DMA16>DMA16 FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=C1
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         DMA16>DMA8  FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=E0
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         DMA16>WORD  FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=FF
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         DMA16>PIO   FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=1E
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         DMA8 >DMA16 FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=3D
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         DMA8 >DMA8  FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=5C
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         DMA8 >WORD  FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=7B
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         DMA8 >PIO   FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=9A
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         WORD >DMA16 FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=B9
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         WORD >DMA8  FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=D8
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         WORD >WORD  FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=F7
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         WORD >PIO   FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=16
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         PIO  >DMA16 FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=35
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         PIO  >DMA8  FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=54
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         PIO  >WORD  FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=73
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 064         PIO  >PIO   FAIL e0 w0/s02 r0/s02 len 64 @0 5A!=92
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         DMA16>DMA16 FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=E2
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         DMA16>DMA8  FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=01
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         DMA16>WORD  FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=20
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         DMA16>PIO   FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=3F
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         DMA8 >DMA16 FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=5E
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         DMA8 >DMA8  FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=7D
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         DMA8 >WORD  FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=9C
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         DMA8 >PIO   FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=BB
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         WORD >DMA16 FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=DA
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         WORD >DMA8  FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=F9
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         WORD >WORD  FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=18
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         WORD >PIO   FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=37
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         PIO  >DMA16 FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=56
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         PIO  >DMA8  FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=75
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         PIO  >WORD  FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=94
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+BUFFER 255         PIO  >PIO   FAIL e0 w0/s02 r0/s02 len 255 @0 5A!=B3
+  write: b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+  read:  b0 w0 f0 c0 p0 tc0 [00 00 00] st00 in00 sq00 ff00 d0 x0
+Medium writes at LBA 15711956
+WRITE 001          DMA16>DMA16 ok     512 b32 w0 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 001          DMA16>PIO   ok     512 b32 w0 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 001          DMA8 >DMA16 ok     512 b64 w0 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 001          DMA8 >PIO   ok     512 b64 w0 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 001          WORD >DMA16 ok     512 b0 w256 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 001          WORD >PIO   ok     512 b0 w256 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 001          PIO  >DMA16 ok     512 b0 w0 f512 c32 p0 tc0 [00 00 00] st93 in10 sqC4 ff00 d0 x0
+WRITE 001          PIO  >PIO   ok     512 b0 w0 f512 c32 p0 tc0 [00 00 00] st93 in10 sqC4 ff00 d0 x0
+WRITE 001 blocks: original restored
+WRITE 008          DMA16>DMA16 ok    4096 b256 w0 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 008          DMA16>PIO   ok    4096 b256 w0 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 008          DMA8 >DMA16 ok    4096 b512 w0 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 008          DMA8 >PIO   ok    4096 b512 w0 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 008          WORD >DMA16 ok    4096 b0 w2048 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 008          WORD >PIO   ok    4096 b0 w2048 f0 c1 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 008          PIO  >DMA16 ok    4096 b0 w0 f4096 c256 p0 tc0 [00 00 00] st93 in10 sqC4 ff00 d0 x0
+WRITE 008          PIO  >PIO   ok    4096 b0 w0 f4096 c256 p0 tc0 [00 00 00] st93 in10 sqC4 ff00 d0 x0
+WRITE 008 blocks: original restored
+WRITE 129          DMA16>DMA16 ok   66048 b4128 w0 f0 c2 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 129          DMA8 >DMA16 ok   66048 b8256 w0 f0 c2 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 129          WORD >DMA16 ok   66048 b0 w33024 f0 c2 p0 tc0 [39 39 39] st93 in10 sqC4 ff00 d0 x0
+WRITE 129 blocks: original restored
+Opening unit 2
+Opening unit 3
+Opening unit 4
+Opening unit 5
+Opening unit 6
+
+RESULT 85 ok, 194 failed, 0 skipped

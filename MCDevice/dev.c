@@ -78,7 +78,7 @@ static LONG scsi(struct MC *mc, struct MCUnit *u, UBYTE *cdb, UWORD cdblen, void
 static LONG sense(struct MC *mc, struct MCUnit *u)
 {
     UBYTE cdb[6] = { 0x03, 0, 0, 0, sizeof mc->sense, 0 };
-    struct Cmd c = { cdb, 6, 1, 0, mc->sense, sizeof mc->sense, 0 };
+    struct Cmd c = { cdb, 6, 1, 0, mc->sense, sizeof mc->sense, 0, 0, 0 };
     memset(mc->sense, 0, sizeof mc->sense);
     if (esp_exec(mc, u->target, u->lun, &c) || c.status)
         return -1;
@@ -102,7 +102,7 @@ static LONG scsi(struct MC *mc, struct MCUnit *u, UBYTE *cdb, UWORD cdblen, void
     int t;
     LONG err = 0;
     for (t = 0; t < TRIES; t++) {
-        struct Cmd c = { cdb, cdblen, in, 0, data, len, 0 };
+        struct Cmd c = { cdb, cdblen, in, 0, data, len, 0, 0, 0 };
         err = esp_exec(mc, u->target, u->lun, &c);
         if (actual)
             *actual = c.actual;
@@ -314,6 +314,32 @@ static void unit_cmd(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior, UBYT
     ior->io_Error = scsi(mc, u, cdb, 6, 0, 0, 0, 0, 0);
 }
 
+/* MCCMD_DIAG: one SCSI command in the chosen transfer mode, for MCDiag. */
+static void diag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
+{
+    struct MCDiagReq *d = ior->io_Data;
+    struct Cmd c;
+
+    if (ior->io_Length < sizeof *d || d->mode >= MCMODES || d->cdblen > 16) {
+        ior->io_Error = IOERR_BADLENGTH;
+        return;
+    }
+    memset(&d->st, 0, sizeof d->st);
+    memset(&c, 0, sizeof c);
+    c.cdb = d->cdb;
+    c.cdblen = d->cdblen;
+    c.in = d->in;
+    c.data = d->data;
+    c.len = d->len;
+    c.mode = d->mode;
+    c.st = &d->st;
+    d->err = esp_exec(mc, u->target, u->lun, &c);
+    d->actual = c.actual;
+    d->status = c.status;
+    d->st.stray = mc->stray;
+    ior->io_Actual = sizeof *d;
+}
+
 static void perform(struct MC *mc, struct IOStdReq *ior)
 {
     struct MCUnit *u = (struct MCUnit *)ior->io_Unit;
@@ -349,6 +375,9 @@ static void perform(struct MC *mc, struct IOStdReq *ior)
         break;
     case HD_SCSICMD:
         scsicmd(mc, u, ior);
+        break;
+    case MCCMD_DIAG:
+        diag(mc, u, ior);
         break;
     case TD_GETGEOMETRY:
         geometry(mc, u, ior);
@@ -410,6 +439,7 @@ static void task_main(void)
     mc->port = &reqport;
     esp_init(mc);
     Signal(mc->starter, SIGF_SINGLE);
+    esp_busreset(mc);                   /* a target may be stuck from before */
     for (;;) {
         struct IOStdReq *ior;
         WaitPort(&reqport);
