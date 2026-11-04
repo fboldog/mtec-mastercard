@@ -23,6 +23,7 @@ MTecPatch/CmdTest
 MTecPatch/RawTest
 MTecPatch/Reboot
 **/gen/stubs.h
+MCDevice/mastercard.device
 *.hunk
 
 # Stray copy of a startup script, from a redirect to a file named "-"

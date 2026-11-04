@@ -20,6 +20,10 @@ struct DosLibrary *DOSBase;
 
 #include "gen/stubs.h"
 
+#ifndef DEV_NAME
+#define DEV_NAME "mtecscsi.device"  /* -DDEV_NAME to test another driver */
+#endif
+
 LONG start(void);
 
 #define P(fmt, ...) do { ULONG a_[] = { 0, ##__VA_ARGS__ }; VPrintf((STRPTR)fmt, (LONG *)(a_ + 1)); } while (0)
@@ -166,7 +170,7 @@ LONG start(void)
     io.io_Message.mn_Length = sizeof(io);
     buf = (ULONG *)AllocMem(BUFSIZE, MEMF_PUBLIC);
     if (buf) {
-        if (!OpenDevice((STRPTR)"mtecscsi.device", 0, (struct IORequest *)&io, 0)) {
+        if (!OpenDevice((STRPTR)DEV_NAME, 0, (struct IORequest *)&io, 0)) {
             test();
             rc = failures ? RETURN_ERROR : RETURN_OK;
             CloseDevice((struct IORequest *)&io);

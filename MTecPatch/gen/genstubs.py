@@ -2,6 +2,12 @@ import re,sys
 N=sys.argv[1]
 want={'exec':('SysBase','FindTask Forbid Permit AllocMem FreeMem WaitPort GetMsg PutMsg ReplyMsg OpenLibrary CloseLibrary SetFunction AddTask FindPort AddPort Wait Signal AllocSignal FindName DoIO OpenDevice CloseDevice ColdReboot Disable Enable CacheClearU TypeOfMem FreeSignal'),
       'dos':('DOSBase','Open Close Read Write DeleteFile Output IoErr VPrintf VFPrintf PrintFault ReadArgs FreeArgs LockDosList UnLockDosList FindDosEntry DeviceProc Delay')}
+# Optional arguments replace the list: lib=Base:Func,Func ...
+if len(sys.argv)>2:
+    want={}
+    for spec in sys.argv[2:]:
+        lib,rest=spec.split('=',1); base,names=rest.split(':',1)
+        want[lib]=(base,names.replace(',',' '))
 out=['/* Generated from the NDK FD files by genstubs.py. */','#include <exec/types.h>']
 for lib,(base,names) in want.items():
     bias=0;fns={}

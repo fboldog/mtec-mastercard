@@ -33,6 +33,7 @@ Results from this one setup may not apply to other cards or disks.
 | `MTecPatch/disk/` | Startup scripts for the floppies |
 | `MTecPatch/*.sh` | Program and floppy image builders |
 | `MTecPatch/mkrom.py`, `mkrom.sh` | Builds a boot ROM with the patch inside, by patching the original image |
+| `MCDevice/` | `mastercard.device`, a new driver written from scratch in C. Work in progress |
 | `MTecROM/` | Builds the same boot ROM from source: turns the ROM into assembler source, then assembles it with the patch |
 | `MTecPatch/logs/` | Logs from real hardware |
 | `MTecPatch/sync_scsi_learning.md` | Why sync SCSI was dropped |
@@ -286,10 +287,41 @@ The decoded `DiagArea` is `$DE` bytes, flags `$10` (nibble-wide, config time).
 
 Addresses are offsets into the driver, from the ROM disassembly.
 
-### Reimplementing the driver
+### New driver
 
-Not worth it today. The patch covers the missing features from RAM, and a new driver
-wouldn't be faster unless the hardware turns out to support DMA.
+`MCDevice/` is a new driver, `mastercard.device`, written from scratch in C. It
+uses M-Tec's code only as a description of the hardware (see `MCDevice/mc.h`):
+- **Chip:** the 53CF94 sits at board `$C000`, register n at `+n*8`. Its interrupt
+  goes to INT2.
+- **Data phases:** the chip runs a DMA Transfer Information. The CPU moves 16 bytes
+  through the data port at `$F000` each time `$C039` bit 7 is set, then words while
+  `$D039` bit 7 is set. This runs with interrupts off, as M-Tec's code does inside
+  its interrupt.
+
+It supports, without a patch:
+- `HD_SCSICMD` with autosense
+- TD64, NSD and ETD commands, the ETD ones checking the change count
+- reads and writes up to 2 TB
+- `TD_GETGEOMETRY`, `TD_EJECT`, `TD_CHANGESTATE` and NSD device query
+
+So far it loads from disk only. It refuses to start while M-Tec's ROM driver is
+running, because both would drive the chip.
+
+Results in Amiberry, on a card whose ROM has the DiagArea flag cleared:
+- **devtest:** probe, geometry and every packet test pass, including the ETD
+  change-count checks.
+- **Integrity:** 64 × 64 KB, and 16 × 512 bytes from a buffer that isn't
+  word-aligned, all pass.
+- **RawTest** (built with `-DDEV_NAME`) on a 6 GB disk: 0 failures across 2 GB and
+  4 GB, and up to 5 GB. A check on the host found every pattern at its exact byte
+  offset.
+
+Not done yet:
+- the boot ROM: our own loader, RDB mounting and booting
+- disconnection
+- detecting medium changes without a command
+- a test on the real card. The 8-byte mode and `$D039` aren't modelled by the
+  emulator.
 
 ## Building
 
