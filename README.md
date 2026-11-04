@@ -365,7 +365,18 @@ takeover), see `MCDevice/logs/`:
 | Odd lengths (INQUIRY 37, 255) | hung until the time-out | pass in all modes |
 | Disk writes of 1, 8 and 129 blocks, all modes | pass, restored | pass, restored, 93 ok, 0 failed |
 | Stray board interrupts | none | none |
-| devtest read speed, 512 / 128 / 32 KB | 3668 / 3573 / 3031 KB/s | 5377 / 5184 / 4178 KB/s |
+| devtest read speed, 512 / 128 / 32 KB | 3668 / 3573 / 3031 KB/s | 5918 / 5666 / 4699 KB/s (run 7) |
+
+Read speed over the runs, all on the same BlueSCSI Pico:
+
+| Run | Change | devtest read, 512 / 128 / 32 KB |
+|---|---|---|
+| 1 | first version, C data loop | 3668 / 3573 / 3031 KB/s |
+| 2 | assembly loop for 16-byte bursts | 5377 / 5184 / 4178 KB/s |
+| 3 | poll for the chip interrupt before sleeping | 5478 / 5268 / 4444 KB/s |
+| 5 | `movem.l` and a `dbpl` loop end: slower, reverted | 5144 / 4943 / 4220 KB/s |
+| 7 | test the flag 8 times before the chip status | 5918 / 5666 / 4699 KB/s |
+| - | M-Tec's own driver | 6024 / 5796 / 4964 KB/s |
 
 What the real board showed:
 - **`$C839` works:** the 8-byte flag is real hardware, not only an M-Tec setting.
