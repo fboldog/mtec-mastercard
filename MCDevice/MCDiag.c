@@ -14,8 +14,7 @@
  *
  * A speed section times 16 reads of 64 KB per mode and one-block commands,
  * and two read comparisons: DMA32 (32 bytes per flag, faster but only safe
- * if the board holds 32 bytes) and MOVE (DMA16 with four move.l, the loop
- * before movem.l). They only report; they don't count as failures.
+ * if the board holds 32 bytes) and MOVEM (DMA16 read with movem.l). They only report; they don't count as failures.
  *
  * Read-only unless WRITE is given. The buffer tests write the drive's own
  * buffer (WRITE BUFFER / READ BUFFER), not the medium. WRITE adds medium
@@ -71,7 +70,7 @@ static UBYTE *ref, *got, *save;
 static ULONG bsize, blocks;
 static UBYTE devtype;
 static UBYTE skipmode[MCMODES];
-static const char *mname[MCMODES] = { "DMA16", "DMA8", "WORD", "PIO", "DMA32", "MOVE" };
+static const char *mname[MCMODES] = { "DMA16", "DMA8", "WORD", "PIO", "DMA32", "MOVEM" };
 
 __attribute__((used)) void *memset(void *d, int c, unsigned long n)
 {
@@ -490,10 +489,10 @@ static void write_tests(ULONG lba)
 
 /* Speed: 16 reads of 64 KB in each mode, timed by the EClock, each checked
    against a DMA16 read; then the time of one command, from 64 reads of one
-   block. DMA32 and MOVE are comparisons, see the top. */
+   block. DMA32 and MOVEM are comparisons, see the top. */
 static void speed_tests(void)
 {
-    static const UBYTE modes[] = { MCMODE_DMA16, MCMODE_DMA8, MCMODE_WORD, MCMODE_DMA32, MCMODE_MOVE };
+    static const UBYTE modes[] = { MCMODE_DMA16, MCMODE_DMA8, MCMODE_WORD, MCMODE_DMA32, MCMODE_MOVEM };
     UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     ULONG len = 0x10000, n = len / bsize, k, i, j, t0, dt;
 

@@ -12,12 +12,12 @@
 
 #define MCCMD_DIAG    0x7FF1
 
-#define MCMODE_DMA16  0     /* 16 bytes per $C039 (reads by movem.l), words at the end: the normal mode */
+#define MCMODE_DMA16  0     /* 16 bytes per $C039, words at the end: the normal mode */
 #define MCMODE_DMA8   1     /* 8 bytes per $C839, words at the end */
 #define MCMODE_WORD   2     /* one word per $D039 */
 #define MCMODE_PIO    3     /* the chip's FIFO, no DMA: the reference */
 #define MCMODE_DMA32  4     /* experiment, reads: 32 bytes per $C039 */
-#define MCMODE_MOVE   5     /* comparison, reads: DMA16 with four move.l, the old loop */
+#define MCMODE_MOVEM  5     /* comparison, reads: DMA16 with two movem.l from $F000 */
 #define MCMODES       6
 #define MCMODES_STD   4     /* the modes every test runs */
 

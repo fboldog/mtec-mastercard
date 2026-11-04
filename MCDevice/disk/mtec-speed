@@ -1,0 +1,6 @@
+; The same devtest speed and latency run on M-Tec's own driver, for comparison.
+; Boot your normal system (mtecscsi.device running), insert this disk, then:
+;   Execute MCTEST:S/mtec-speed 1        (1 = the SCSI unit of the disk)
+.key UNIT/A
+MCTEST:C/devtest -bb mtecscsi.device <UNIT> >MCTEST:mtec.txt
+Echo "The result is MCTEST:mtec.txt"
