@@ -403,9 +403,26 @@ transfers, so `NODMA8` and `NOPIO` leave those modes out there.
 
 MCDiag measures the difference: its SPEED lines give the longest gap between
 vertical blank interrupts during the reads (20 ms on PAL when nothing delays
-them). In Amiberry the interrupt build keeps exactly 20.0 ms; the polled one
-reaches 22.8 ms there, and more is expected on the card, where chunks take
-longer.
+them).
+
+On the real card (runs 7-9, same BlueSCSI):
+
+| | Polled | Interrupt |
+|---|---|---|
+| devtest read, 512 / 128 / 32 KB | 5918 / 5666 / 4699 KB/s | 5892 / 5620 / 4676 KB/s |
+| MCDiag, 16 reads of 64 KB | 3724 KB/s | 3829 KB/s |
+| Longest vertical blank gap during reads | 22-34 ms in the polled modes | 20.06 ms, as when idle (20.04) |
+| Server entries / timer sleeps per command | - | 2 / 0 |
+
+The interrupt build is the recommended one: the same speed within 1%, and
+audio, serial and the display keep running during transfers.
+
+devtest's 8 KB latency on the BlueSCSI reads 2.09 ms polled and 3.02 ms with
+interrupts, but MCDiag's per-command times differ by only tens of
+microseconds. All of devtest's latencies on this drive sit near whole
+milliseconds (1.02, 2.09, 3.01), which suggests the drive works in about 1 ms
+steps. A small timing change can then cost a full step. A spinning disk would
+confirm it.
 
 #### Boot ROM
 
