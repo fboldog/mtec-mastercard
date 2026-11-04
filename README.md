@@ -445,13 +445,20 @@ At boot:
    `RTF_COLDSTART`.
 3. **Starting the driver:** exec starts it with the other residents, after
    timer.device and before dos.library.
-4. **Mounting:** the driver resets the bus, then looks at targets 0-6, LUN 0. On
-   each disk with 512-byte blocks it reads the RDB, and:
+4. **Mounting:** the driver resets the bus and waits the 250 ms the SCSI standard
+   allows. After a warm reboot, a drive can otherwise still hang in the transfer
+   that was cut off; M-Tec's ROM resets the bus too. Then it looks at targets 0-6,
+   LUN 0. A disk that isn't ready yet is started and given up to 10 s. On each
+   disk with 512-byte blocks it reads the RDB, and:
    - loads each file system stored in the RDB with its own hunk loader, unless
      FileSystem.resource already has that version or a newer one, since
      dos.library isn't running yet;
    - adds a boot node for each partition: bootable ones with their boot
-     priority, the others with -128, so they mount but don't boot.
+     priority, the others with -128, so they mount but don't boot;
+   - stops the scan if the RDB has "last disk" set (`RDBFF_LAST` or
+     `RDBFF_LASTTID`), so empty higher IDs cost no time: 250 ms each otherwise.
+     amitools' `rdbtool` sets these flags on every RDB it makes, so clear them
+     on a disk that has others after it.
 5. **Booting:** BootPoint starts dos.library, which boots from the highest
    boot priority.
 

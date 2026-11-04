@@ -133,12 +133,15 @@ void esp_init(struct MC *mc)
     mc->ipending = 0;
 }
 
+/* Resets the SCSI bus, then waits the 250 ms the standard allows a device
+   before it must answer selection. A drive that is still spinning up answers
+   NOT READY after that, which the commands retry. */
 void esp_busreset(struct MC *mc)
 {
     wr(mc, R_CMD, C_BUSRESET);
-    mc_delay(mc, 250000);
+    mc_delay(mc, 1000);                 /* the chip holds RST for about 25 us */
     esp_init(mc);
-    mc_delay(mc, 2000000);              /* let the devices come back */
+    mc_delay(mc, 250000);
 }
 
 /* The DMA16 inner loops, in assembly for speed. Each moves 16 bytes each

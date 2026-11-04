@@ -8,6 +8,10 @@
  * partitions get their boot priority; the others -128, so they mount but
  * don't boot. dos.library isn't running yet, so file systems are loaded by
  * the small hunk loader here, not LoadSeg.
+ *
+ * A disk that isn't ready yet is started and given up to 10 s. The scan
+ * stops after a disk whose RDB has RDBFF_LAST or RDBFF_LASTTID set ("last
+ * disk" in partitioning tools), so empty higher IDs cost no time.
  */
 #include <devices/hardblocks.h>
 #include <resources/filesysres.h>
@@ -331,6 +335,15 @@ static void mount_all(struct MC *mc, struct IOStdReq *ior)
             probe(mc, &pr);
         }
         u = mc->units[t];
+        if (u && u->type == 0 && !u->shift) {
+            /* No capacity yet: probably still spinning up after power-on.
+               Start it and wait up to 10 s for it to become ready. */
+            UBYTE cdb[6] = { 0x1B, 0, 0, 0, 0x01, 0 };
+            UWORD k;
+            scsi(mc, u, cdb, 6, 0, 0, 0, 0, 0);
+            for (k = 0; k < 20 && read_capacity(mc, u); k++)
+                mc_delay(mc, 500000);
+        }
         if (!u || u->type != 0 || u->shift != 9)
             continue;                       /* disks with 512-byte blocks only */
         for (blk = 0; blk < RDB_LIMIT; blk++)
@@ -341,9 +354,14 @@ static void mount_all(struct MC *mc, struct IOStdReq *ior)
         {
             struct RigidDiskBlock *rdb = (struct RigidDiskBlock *)buf;
             ULONG parts = rdb->rdb_PartitionList, fs = rdb->rdb_FileSysHeaderList;
+            ULONG flags = rdb->rdb_Flags;
             if (fsr)
                 load_filesystems(mc, u, fsr, fs, buf, buf + 128);
             add_partitions(mc, u, fsr, parts, buf, cd);
+            /* "Last disk" in the RDB: no need to look at the higher IDs,
+               which saves 250 ms each when they are empty. */
+            if (flags & (RDBFF_LAST | RDBFF_LASTTID))
+                break;
         }
     }
     CloseLibrary(ExpansionBase);
