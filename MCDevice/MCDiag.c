@@ -12,6 +12,11 @@
  * chip FIFO, DMA chunks, the longest wait, and the flags and chip registers at
  * the end.
  *
+ * A speed section times 16 reads of 64 KB per mode and one-block commands,
+ * and two read comparisons: DMA32 (32 bytes per flag, faster but only safe
+ * if the board holds 32 bytes) and MOVE (DMA16 with four move.l, the loop
+ * before movem.l). They only report; they don't count as failures.
+ *
  * Read-only unless WRITE is given. The buffer tests write the drive's own
  * buffer (WRITE BUFFER / READ BUFFER), not the medium. WRITE adds medium
  * writes at LBA (default: 300 blocks before the end): each block is read,
@@ -40,11 +45,13 @@ __asm("  .text\n  jmp _start\n");
 #include <devices/trackdisk.h>
 #include <libraries/configvars.h>
 #include <hardware/intbits.h>
+#include <devices/timer.h>
 #include "mcdiag.h"
 
 struct ExecBase *SysBase;
 struct DosLibrary *DOSBase;
 struct Library *ExpansionBase;
+struct Device *TimerBase;
 
 #include "gen/tstubs.h"
 
@@ -64,7 +71,7 @@ static UBYTE *ref, *got, *save;
 static ULONG bsize, blocks;
 static UBYTE devtype;
 static UBYTE skipmode[MCMODES];
-static const char *mname[MCMODES] = { "DMA16", "DMA8", "WORD", "PIO" };
+static const char *mname[MCMODES] = { "DMA16", "DMA8", "WORD", "PIO", "DMA32", "MOVE" };
 
 __attribute__((used)) void *memset(void *d, int c, unsigned long n)
 {
@@ -202,6 +209,23 @@ static int takeover(void)
 /* ---- running commands ---- */
 
 static struct MCDiagReq dr;
+static struct timerequest treq;
+static ULONG efreq;                     /* EClock ticks per second, 0 without timer */
+static ULONG lastus;                    /* time of the last run() */
+
+static ULONG now(void)
+{
+    struct EClockVal ev;
+    if (!efreq)
+        return 0;
+    ReadEClock(&ev);
+    return ev.ev_lo;
+}
+
+static ULONG ticks_us(ULONG t)
+{
+    return efreq ? t / (efreq / 1000) * 1000 + t % (efreq / 1000) * 1000 / (efreq / 1000) : 0;
+}
 
 static LONG run(UBYTE mode, const UBYTE *cdb, UWORD cdblen, UBYTE in, UBYTE *data, ULONG len)
 {
@@ -217,23 +241,28 @@ static LONG run(UBYTE mode, const UBYTE *cdb, UWORD cdblen, UBYTE in, UBYTE *dat
     io.io_Command = MCCMD_DIAG;
     io.io_Data = &dr;
     io.io_Length = sizeof dr;
-    if (DoIO((struct IORequest *)&io))
-        return io.io_Error;
+    {
+        ULONG t0 = now();
+        BYTE e = DoIO((struct IORequest *)&io);
+        lastus = ticks_us(now() - t0);
+        if (e)
+            return io.io_Error;
+    }
     return dr.err;
 }
 
 static void stats(void)
 {
     struct MCStats *s = &dr.st;
-    P(" b%lu w%lu f%lu c%lu p%lu tc%lx [%02lx %02lx %02lx] st%02lx in%02lx sq%02lx ff%02lx d%lu x%lu\n",
+    P(" b%lu w%lu f%lu c%lu p%lu tc%lx [%02lx %02lx %02lx] st%02lx in%02lx sq%02lx ff%02lx d%lu x%lu t%luus\n",
       s->bursts, s->words, s->fifo, s->chunks, s->maxpolls, s->tcleft,
       (ULONG)s->dreq16, (ULONG)s->dreq8, (ULONG)s->dreqw,
-      (ULONG)s->stat, (ULONG)s->intr, (ULONG)s->seq, (ULONG)s->fflags, s->drained, s->stray);
+      (ULONG)s->stat, (ULONG)s->intr, (ULONG)s->seq, (ULONG)s->fflags, s->drained, s->stray, lastus);
 }
 
 /* The normal mode (DMA16) into ref, then the others into got, compared with
    ref. align puts the data at got+align, with guard bytes around it. */
-static const UBYTE order[MCMODES] = { MCMODE_DMA16, MCMODE_DMA8, MCMODE_WORD, MCMODE_PIO };
+static const UBYTE order[MCMODES_STD] = { MCMODE_DMA16, MCMODE_DMA8, MCMODE_WORD, MCMODE_PIO };
 
 static void test(const char *name, const UBYTE *cdb, UWORD cdblen, ULONG len, ULONG align)
 {
@@ -242,7 +271,7 @@ static void test(const char *name, const UBYTE *cdb, UWORD cdblen, ULONG len, UL
 
     P("-- %s\n", (ULONG)name);         /* flushed: shows where a hang happened */
 
-    for (k = 0; k < MCMODES; k++) {
+    for (k = 0; k < MCMODES_STD; k++) {
         UBYTE m = order[k];
         UBYTE *g = k ? got + align : ref;
         if ((m == MCMODE_PIO && len > PIO_MAX) || skipmode[m])
@@ -400,8 +429,8 @@ static void buffer_tests(void)
         wcdb[0] = 0x3B; wcdb[1] = 0x02; wcdb[8] = len;  /* WRITE BUFFER, data */
         memset(rcdb, 0, sizeof rcdb);
         rcdb[0] = 0x3C; rcdb[1] = 0x02; rcdb[8] = len;  /* READ BUFFER, data */
-        for (wm = 0; wm < MCMODES; wm++)
-            for (rm = 0; rm < MCMODES; rm++) {
+        for (wm = 0; wm < MCMODES_STD; wm++)
+            for (rm = 0; rm < MCMODES_STD; rm++) {
                 if (skipmode[wm] || skipmode[rm])
                     continue;
                 char name[16] = "BUFFER ";
@@ -439,7 +468,7 @@ static void write_tests(ULONG lba)
             P("%s blocks: cannot read the original, stopping\n", (ULONG)name);
             return;
         }
-        for (wm = 0; wm < MCMODES; wm++) {
+        for (wm = 0; wm < MCMODES_STD; wm++) {
             if ((wm == MCMODE_PIO && len > PIO_MAX) || skipmode[wm])
                 continue;
             roundtrip(name, wcdb, rcdb, 10, len, wm, MCMODE_DMA16, n + wm);
@@ -457,6 +486,73 @@ static void write_tests(ULONG lba)
         }
         P("%s blocks: original restored\n", (ULONG)name);
     }
+}
+
+/* Speed: 16 reads of 64 KB in each mode, timed by the EClock, each checked
+   against a DMA16 read; then the time of one command, from 64 reads of one
+   block. DMA32 and MOVE are comparisons, see the top. */
+static void speed_tests(void)
+{
+    static const UBYTE modes[] = { MCMODE_DMA16, MCMODE_DMA8, MCMODE_WORD, MCMODE_DMA32, MCMODE_MOVE };
+    UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    ULONG len = 0x10000, n = len / bsize, k, i, j, t0, dt;
+
+    if (!efreq) {
+        P("SPEED              skipped: no EClock\n");
+        return;
+    }
+    cdb[7] = n >> 8;
+    cdb[8] = n;
+    if (run(MCMODE_DMA16, cdb, 10, 1, ref, len) || dr.status || dr.actual != len) {
+        P("SPEED              skipped: the reference read failed\n");
+        skips++;
+        return;
+    }
+    for (k = 0; k < sizeof modes; k++) {
+        UBYTE m = modes[k];
+        ULONG bad = 0, err = 0;
+        if (skipmode[m])
+            continue;
+        t0 = now();
+        for (j = 0; j < 16; j++) {
+            if (run(m, cdb, 10, 1, got, len) || dr.status || dr.actual != len) {
+                err++;
+                break;
+            }
+            if (!j) {
+                for (i = 0; i < len && got[i] == ref[i]; i++) ;
+                if (i != len)
+                    bad = i + 1;
+            }
+        }
+        dt = now() - t0;
+        if (err) {
+            if (m < MCMODES_STD)
+                fails++;                /* the experiments only report */
+            P("SPEED 64K x16      %-5s ERR %ld %lu/%lu", (ULONG)mname[m], dr.err, dr.actual, len);
+            stats();
+        } else {
+            if (bad) {
+                if (m < MCMODES_STD)
+                    fails++;
+                P("SPEED 64K x16      %-5s DIFF @%lx %02lx!=%02lx  %lu KB/s", (ULONG)mname[m], bad - 1,
+                  (ULONG)got[bad - 1], (ULONG)ref[bad - 1], dt ? 1024 * efreq / dt : 0);
+            } else {
+                oks++;
+                P("SPEED 64K x16      %-5s same %lu KB/s, %lu us per 64 KB", (ULONG)mname[m],
+                  dt ? 1024 * efreq / dt : 0, ticks_us(dt) / 16);
+            }
+            stats();
+        }
+    }
+    cdb[7] = 0;
+    cdb[8] = 1;
+    t0 = now();
+    for (j = 0; j < 64; j++)
+        if (run(MCMODE_DMA16, cdb, 10, 1, got, bsize) || dr.status)
+            break;
+    dt = now() - t0;
+    P("SPEED 1 block x64  DMA16 %lu us per command\n", ticks_us(dt) / 64);
 }
 
 static int open_unit(ULONG unit)
@@ -522,6 +618,7 @@ static void unit_tests(ULONG unit, int write, ULONG wlba)
         read_test("READ 8 buf+3", 0, 8, 3);
         for (k = 1; k <= 8; k++)
             read_test("READ 64K spread", (blocks - n64) / 9 * k, n64, 0);
+        speed_tests();
     }
     buffer_tests();
     if (write && bsize && blocks > 600)
@@ -573,6 +670,13 @@ LONG start(void)
     P("MCDiag 0.1 - data port tests for mastercard.device\n");
     if (args[1] && !takeover())
         goto done;
+    treq.tr_node.io_Message.mn_ReplyPort = &port;
+    treq.tr_node.io_Message.mn_Length = sizeof treq;
+    if (!OpenDevice((STRPTR)"timer.device", UNIT_ECLOCK, (struct IORequest *)&treq, 0)) {
+        struct EClockVal ev;
+        TimerBase = treq.tr_node.io_Device;
+        efreq = ReadEClock(&ev);
+    }
     ref = (UBYTE *)AllocMem(BUFSIZE, MEMF_PUBLIC);
     got = (UBYTE *)AllocMem(BUFSIZE, MEMF_PUBLIC);
     save = (UBYTE *)AllocMem(BUFSIZE, MEMF_PUBLIC);
@@ -600,6 +704,7 @@ done:
     if (ref) FreeMem(ref, BUFSIZE);
     if (got) FreeMem(got, BUFSIZE);
     if (save) FreeMem(save, BUFSIZE);
+    if (TimerBase) CloseDevice((struct IORequest *)&treq);
     if (logfh) Close(logfh);
     if (ra) FreeArgs(ra);
     CloseLibrary((struct Library *)DOSBase);

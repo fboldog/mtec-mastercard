@@ -129,8 +129,10 @@ void esp_busreset(struct MC *mc)
 }
 
 /* The DMA16 inner loops, in assembly for speed. Each moves 16 bytes each
-   time the flag is set, until bursts is 0, the chip interrupts (the target
-   stopped early) or limit polls pass without the flag. */
+   time the flag is set, until bursts is 0 (at most 4096, one 64 KB chunk),
+   the chip interrupts (the target stopped early) or limit polls pass
+   without the flag. Reads take the 16 bytes with two movem.l of 8 bytes
+   from $F000: the card answers up to $F00F, emulators only to $F007. */
 struct Fast {
     volatile UBYTE *flag;
     volatile ULONG *port;
@@ -139,70 +141,153 @@ struct Fast {
     volatile UBYTE *stat;
     ULONG limit;
 };
-void fast16_in(struct Fast *f __asm("a0"));
+void fast16_in(struct Fast *f __asm("a0"));     /* two movem.l over $F000-$F007 per flag */
 void fast16_out(struct Fast *f __asm("a0"));
+void fast32_in(struct Fast *f __asm("a0"));     /* MCMODE_DMA32: 32 bytes per flag */
+void move16_in(struct Fast *f __asm("a0"));     /* MCMODE_MOVE: four move.l per flag, the old way */
 __asm(
 "  .text\n"
 "  .globl _fast16_in\n"
-"_fast16_in:\n"
-"  movem.l d2/a2-a5,-(sp)\n"
-"  movem.l (a0),a2-a4\n"             /* flag, port, buf */
-"  move.l 12(a0),d0\n"              /* bursts */
-"  movea.l 16(a0),a5\n"             /* chip status */
-"  move.l 20(a0),d1\n"              /* limit */
-"  tst.l d0\n"
-"  beq.s 9f\n"
-"1:move.l d1,d2\n"
-"2:tst.b (a2)\n"
-"  bmi.s 3f\n"
-"  tst.b (a5)\n"
-"  bmi.s 9f\n"
-"  subq.l #1,d2\n"
-"  bne.s 2b\n"
-"  bra.s 9f\n"
-"3:move.l (a3),(a4)+\n"
-"  move.l (a3),(a4)+\n"
-"  move.l (a3),(a4)+\n"
-"  move.l (a3),(a4)+\n"
-"  subq.l #1,d0\n"
-"  beq.s 9f\n"
-"  tst.b (a2)\n"
-"  bmi.s 3b\n"
-"  bra.s 1b\n"
-"9:move.l a4,8(a0)\n"
-"  move.l d0,12(a0)\n"
-"  movem.l (sp)+,d2/a2-a5\n"
-"  rts\n"
-"  .globl _fast16_out\n"
-"_fast16_out:\n"
-"  movem.l d2/a2-a5,-(sp)\n"
+"  _fast16_in:\n"
+"  movem.l d2-d6/a2-a5,-(sp)\n"
 "  movem.l (a0),a2-a4\n"
 "  move.l 12(a0),d0\n"
 "  movea.l 16(a0),a5\n"
 "  move.l 20(a0),d1\n"
-"  tst.l d0\n"
-"  beq.s 9f\n"
-"1:move.l d1,d2\n"
-"2:tst.b (a2)\n"
+"  subq.l #1,d0\n"
+"  bmi.s 8f\n"
+"  1:move.l d1,d2\n"
+"  2:tst.b (a2)\n"
 "  bmi.s 3f\n"
 "  tst.b (a5)\n"
-"  bmi.s 9f\n"
+"  bmi.s 7f\n"
 "  subq.l #1,d2\n"
 "  bne.s 2b\n"
-"  bra.s 9f\n"
-"3:move.l (a4)+,(a3)\n"
-"  move.l (a4)+,(a3)\n"
-"  move.l (a4)+,(a3)\n"
-"  move.l (a4)+,(a3)\n"
-"  subq.l #1,d0\n"
-"  beq.s 9f\n"
+"  bra.s 7f\n"
+"  3:movem.l (a3),d3-d4\n"
+"  movem.l (a3),d5-d6\n"
+"  movem.l d3-d6,(a4)\n"
+"  lea 16(a4),a4\n"
 "  tst.b (a2)\n"
-"  bmi.s 3b\n"
-"  bra.s 1b\n"
-"9:move.l a4,8(a0)\n"
+"  dbpl d0,3b\n"
+"  cmp.w #-1,d0\n"
+"  beq.s 8f\n"
+"  subq.w #1,d0\n"
+"  bpl.s 1b\n"
+"  8:moveq #0,d0\n"
+"  bra.s 9f\n"
+"  7:addq.l #1,d0\n"
+"  9:move.l a4,8(a0)\n"
 "  move.l d0,12(a0)\n"
-"  movem.l (sp)+,d2/a2-a5\n"
-"  rts\n");
+"  movem.l (sp)+,d2-d6/a2-a5\n"
+"  rts\n"
+"  .globl _fast16_out\n"
+"  _fast16_out:\n"
+"  movem.l d2-d6/a2-a5,-(sp)\n"
+"  movem.l (a0),a2-a4\n"
+"  move.l 12(a0),d0\n"
+"  movea.l 16(a0),a5\n"
+"  move.l 20(a0),d1\n"
+"  subq.l #1,d0\n"
+"  bmi.s 8f\n"
+"  1:move.l d1,d2\n"
+"  2:tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a5)\n"
+"  bmi.s 7f\n"
+"  subq.l #1,d2\n"
+"  bne.s 2b\n"
+"  bra.s 7f\n"
+"  3:move.l (a4)+,(a3)\n"
+"  move.l (a4)+,(a3)\n"
+"  move.l (a4)+,(a3)\n"
+"  move.l (a4)+,(a3)\n"
+"  tst.b (a2)\n"
+"  dbpl d0,3b\n"
+"  cmp.w #-1,d0\n"
+"  beq.s 8f\n"
+"  subq.w #1,d0\n"
+"  bpl.s 1b\n"
+"  8:moveq #0,d0\n"
+"  bra.s 9f\n"
+"  7:addq.l #1,d0\n"
+"  9:move.l a4,8(a0)\n"
+"  move.l d0,12(a0)\n"
+"  movem.l (sp)+,d2-d6/a2-a5\n"
+"  rts\n"
+"  .globl _fast32_in\n"
+"  _fast32_in:\n"
+"  movem.l d2-d6/a2-a5,-(sp)\n"
+"  movem.l (a0),a2-a4\n"
+"  move.l 12(a0),d0\n"
+"  movea.l 16(a0),a5\n"
+"  move.l 20(a0),d1\n"
+"  subq.l #1,d0\n"
+"  bmi.s 8f\n"
+"  1:move.l d1,d2\n"
+"  2:tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a5)\n"
+"  bmi.s 7f\n"
+"  subq.l #1,d2\n"
+"  bne.s 2b\n"
+"  bra.s 7f\n"
+"  3:move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  tst.b (a2)\n"
+"  dbpl d0,3b\n"
+"  cmp.w #-1,d0\n"
+"  beq.s 8f\n"
+"  subq.w #1,d0\n"
+"  bpl.s 1b\n"
+"  8:moveq #0,d0\n"
+"  bra.s 9f\n"
+"  7:addq.l #1,d0\n"
+"  9:move.l a4,8(a0)\n"
+"  move.l d0,12(a0)\n"
+"  movem.l (sp)+,d2-d6/a2-a5\n"
+"  rts\n"
+"  .globl _move16_in\n"
+"  _move16_in:\n"
+"  movem.l d2-d6/a2-a5,-(sp)\n"
+"  movem.l (a0),a2-a4\n"
+"  move.l 12(a0),d0\n"
+"  movea.l 16(a0),a5\n"
+"  move.l 20(a0),d1\n"
+"  subq.l #1,d0\n"
+"  bmi.s 8f\n"
+"  1:move.l d1,d2\n"
+"  2:tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a5)\n"
+"  bmi.s 7f\n"
+"  subq.l #1,d2\n"
+"  bne.s 2b\n"
+"  bra.s 7f\n"
+"  3:move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  tst.b (a2)\n"
+"  dbpl d0,3b\n"
+"  cmp.w #-1,d0\n"
+"  beq.s 8f\n"
+"  subq.w #1,d0\n"
+"  bpl.s 1b\n"
+"  8:moveq #0,d0\n"
+"  bra.s 9f\n"
+"  7:addq.l #1,d0\n"
+"  9:move.l a4,8(a0)\n"
+"  move.l d0,12(a0)\n"
+"  movem.l (sp)+,d2-d6/a2-a5\n"
+"  rts\n"
+);
 
 /* Moves one DMA chunk of a data phase. Runs disabled; ends at the chip's
    interrupt, whose registers it latches like mc_irq would.
@@ -227,20 +312,26 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     st->chunks++;
     Disable();
     wr(mc, R_CMD, C_DMA | C_TI);
-    if (c->mode == MCMODE_DMA16 && left >= 16) {
-        /* The bulk of it in assembly: 16 bytes per flag, like the original. */
+    if (c->mode != MCMODE_DMA8 && c->mode != MCMODE_WORD && left >= 16) {
+        /* The bulk of it in assembly: 16 bytes per flag, like the original.
+           DMA32 and MOVE are read comparisons; their writes are DMA16. */
         struct Fast f;
+        UBYTE sh = in && c->mode == MCMODE_DMA32 ? 5 : 4;
         f.flag = dreqb;
         f.port = pl;
         f.buf = p;
-        f.bursts = left >> 4;
+        f.bursts = left >> sh;
         f.stat = &REG(mc, R_STAT);
         f.limit = SPIN_LIMIT;
-        if (in)
-            fast16_in(&f);
-        else
+        if (!in)
             fast16_out(&f);
-        st->bursts += (left >> 4) - f.bursts;
+        else if (c->mode == MCMODE_DMA32)
+            fast32_in(&f);
+        else if (c->mode == MCMODE_MOVE)
+            move16_in(&f);
+        else
+            fast16_in(&f);
+        st->bursts += (left >> sh) - f.bursts;
         left -= (UBYTE *)f.buf - p;
         p = (UBYTE *)f.buf;
     }
