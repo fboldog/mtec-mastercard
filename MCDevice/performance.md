@@ -56,6 +56,28 @@ maximum responsiveness. A single universal optimum is not expected because the
 target's command latency and the accelerator RAM timing matter as much as CPU
 clock.
 
+## 68030 inner-loop analysis
+
+The MC680x0 reference timing tables confirm the real-card results. These are
+nominal core timings with a warm instruction cache; MasterCard and RAM wait
+states are additional.
+
+| Sequence | Nominal 68030 result | Decision |
+|---|---:|---|
+| `tst.b (a2)` plus `bmi` | `tst` is 2 clocks plus the 3-clock `(An)` fetch; an immediate-memory `btst #7` costs more. | Keep `tst.b` and the sign branch. |
+| Four `move.l (a3),(a4)+` | About 7 clocks per longword, 28 clocks per 16-byte board request, before bus wait states. | Best safe DMA16 copy tested. |
+| Two source `movem.l` plus one destination `movem.l` | About 44 clocks for the three transfers, plus pointer adjustment. | Slower in theory and on the card; retain only as a diagnostic comparison. |
+| `subq.l` plus `beq` | 6 clocks on normal iterations; the comparable `dbcc` path is also 6 and is slower when the counter expires. | Keep the current counter loop. |
+| Eight longword moves per `$C039` test | Saves one flag access and loop branch per 32 bytes, explaining the measured DMA32 gain. | Not a production setting: `$C039` only guarantees 16 bytes. |
+
+The hot part of `fast16_in` is about 62 bytes, so it fits comfortably in the
+68030's 256-byte instruction cache. Alignment or further opcode substitution is
+therefore unlikely to produce a material gain. The remaining safe opportunities
+are outside the four-move kernel: reduce avoidable DREQ/status accesses and use
+the CF94's extended transfer counter to avoid restarting a long data phase every
+64 KiB. The latter must remain an opt-in IRQ-build experiment until it passes
+parity, gross-error, short-transfer and data-integrity tests on the card.
+
 ## Build-time tuning
 
 The default is 42 MHz:
