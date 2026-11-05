@@ -25,6 +25,7 @@ as a comparison.
 | DMA32 | Skipping every second `$C039` check was about 8% faster in MCDiag, but the flag only guarantees 16 bytes. | Diagnostic experiment only; do not auto-select. |
 | IRQ wait | Small commands normally finish inside the short poll and report zero timer sleeps, so they consume CPU while waiting. | Tune `MC_FAST_POLLS` for throughput versus task responsiveness. |
 | Bulk IRQ behavior | A 64 KiB read normally takes two server entries and zero timer sleeps. M-Tec's disassembled handler uses the same four-longword transfer and a similar run of DREQ tests. | `MC_FAST_POLLS` cannot materially accelerate the bulk inner loop. |
+| IRQ duration | Exec recommends deferring lengthy interrupt work, but the board appears to hold INT2 active while DREQ is asserted. Returning without moving the data would immediately retrigger the PORTS interrupt. | Keep the IRQ copy until a board-level DREQ interrupt mask or acknowledge mechanism is identified. A software interrupt alone does not solve this. |
 | Disconnect/reselect | IDENTIFY forbids disconnect and the driver executes one request at a time. | Low priority for one solid-state target; potentially important with multiple targets or mechanical disks. |
 | Synchronous SCSI | MCDevice deliberately selects asynchronous operation. Previous sync tests used the old driver and do not prove MCDevice cannot support it, but they showed FIFO/gross-error risk and no speed gain. | Do not enable until error handling has passed on hardware. Then test offsets 4 and 8 with automatic async fallback. |
 | Write performance | Correctness and restore tests exist, but comparable write-throughput measurements do not. | Add restored-area write timing before tuning the output loop. |
@@ -121,6 +122,22 @@ Do not change scheduling merely to improve this reported percentage. Use
 throughput, command latency, maximum vertical-blank gap and integrity as the
 primary measurements; a separate cycle/progress measurement is needed for true
 CPU consumption.
+
+The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
+in supervisor mode on the common system stack, outside task-stack execution.
+Only when an interrupt is about to return to user mode does Exec check whether
+the scheduler must run. The task fields used by `devtest` are explicitly the
+callbacks for a task losing and getting the CPU, so they do not bracket ordinary
+interrupt entry and exit.
+
+The same reference says interrupt code should finish promptly and defer lengthy
+work through a software interrupt or a signalled task. That advice cannot be
+applied mechanically here. The board's data request itself appears to drive the
+shared level-2 PORTS interrupt and remains active until the CPU services the data
+port. A deferred routine would leave INT2 pending and prevent useful task
+execution unless the board or CF94 path provides a separate way to mask or
+acknowledge DREQ while preserving the transfer. No such register is currently
+known.
 
 ## Build-time tuning
 
