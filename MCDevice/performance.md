@@ -72,3 +72,30 @@ MC_CPU_MHZ=50 ./build.sh
 
 The clock value does not alter CF94 timing registers. Those continue to describe
 the card's 40 MHz SCSI-controller clock.
+
+## A4091 comparison
+
+The A4091 is useful as a correctness reference, but its low CPU use does not
+describe the MasterCard data path.
+
+- A4091 commit `ca3b1f8` adds `START UNIT` during attachment; it is not a
+  performance change.
+- The related polling fix is `94cd375` (`siop_poll(): Turn interrupts on before
+  exiting`). Its timeout path failed to release an interrupt-disable level. The
+  intended call was corrected to `bsd_splx(s)` in `89468e8`; `43a67be` later
+  made every BSD SPL wrapper pair map one-to-one to Exec `Disable()`/`Enable()`.
+- Leaking an interrupt-disable level made later timer delays busy-poll and could
+  eventually leave interrupts masked. This explains abnormally high CPU use
+  after the A4091 error path, but it does not make its DMA engine faster.
+- MCDevice's comparable paths have been audited. The IRQ timeout and both exits
+  from the polled DMA phase pair every `Disable()` with `Enable()`; MCDiag's
+  takeover drain is paired as well.
+
+The A4091's NCR53C710 is a bus-master controller: its SCRIPTS engine follows
+scatter/gather DMA addresses and moves payload directly between SCSI and Amiga
+RAM. The MasterCard's 53CF94 uses its DMA interface and the card's DMA data port,
+but the 68030 still moves each word/longword between that port and RAM. Therefore
+an A4091 result near 5% CPU cannot be reached by applying its interrupt-balance
+fix to MCDevice. MCDevice can reduce flag polls, phase restarts and task wakeups,
+but payload-copy CPU time remains unless the MasterCard hardware has an
+undocumented bus-master path.
