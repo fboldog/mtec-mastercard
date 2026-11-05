@@ -421,6 +421,16 @@ On the real card (runs 7-9, same BlueSCSI):
 The interrupt build is the recommended one: the same speed within 1%, and
 audio, serial and the display keep running during transfers.
 
+`devtest`'s CPU percentage is not a count of CPU cycles spent by the driver.
+It times how long a priority -10 spin task remains scheduled, using that task's
+`tc_Launch` and `tc_Switch` hooks. Hardware interrupts do not switch tasks, so
+time spent copying data inside an interrupt server is counted as idle whenever
+the spin task was current when the interrupt arrived. Conversely, MCDevice can
+show 100% when its own task is current as the immediate data interrupt arrives.
+This explains why M-Tec's driver reports 13% despite executing essentially the
+same CPU copy loop. The percentage is useful for task availability, but cannot
+compare the true copy cost of two interrupt-driven drivers.
+
 devtest's 8 KB latency on the BlueSCSI reads 2.09 ms polled and 3.02 ms with
 interrupts, but MCDiag's per-command times differ by only tens of
 microseconds. All of devtest's latencies on this drive sit near whole

@@ -24,7 +24,7 @@ as a comparison.
 | DMA16 | The `$C039` path is correct and fastest among the guaranteed board modes. | Production default. |
 | DMA32 | Skipping every second `$C039` check was about 8% faster in MCDiag, but the flag only guarantees 16 bytes. | Diagnostic experiment only; do not auto-select. |
 | IRQ wait | Small commands normally finish inside the short poll and report zero timer sleeps, so they consume CPU while waiting. | Tune `MC_FAST_POLLS` for throughput versus task responsiveness. |
-| Bulk IRQ behavior | A 64 KiB read normally takes two server entries and zero timer sleeps. M-Tec's disassembled handler uses the same four-longword transfer and a similar run of DREQ tests. | Treat the reported 100% versus M-Tec's 13% CPU as an accounting/scheduling question as well as copy cost. `MC_FAST_POLLS` cannot materially accelerate the bulk inner loop. |
+| Bulk IRQ behavior | A 64 KiB read normally takes two server entries and zero timer sleeps. M-Tec's disassembled handler uses the same four-longword transfer and a similar run of DREQ tests. | `MC_FAST_POLLS` cannot materially accelerate the bulk inner loop. |
 | Disconnect/reselect | IDENTIFY forbids disconnect and the driver executes one request at a time. | Low priority for one solid-state target; potentially important with multiple targets or mechanical disks. |
 | Synchronous SCSI | MCDevice deliberately selects asynchronous operation. Previous sync tests used the old driver and do not prove MCDevice cannot support it, but they showed FIFO/gross-error risk and no speed gain. | Do not enable until error handling has passed on hardware. Then test offsets 4 and 8 with automatic async fallback. |
 | Write performance | Correctness and restore tests exist, but comparable write-throughput measurements do not. | Add restored-area write timing before tuning the output loop. |
@@ -77,6 +77,32 @@ are outside the four-move kernel: reduce avoidable DREQ/status accesses and use
 the CF94's extended transfer counter to avoid restarting a long data phase every
 64 KiB. The latter must remain an opt-in IRQ-build experiment until it passes
 parity, gross-error, short-transfer and data-integrity tests on the card.
+
+## Interpreting devtest CPU usage
+
+The CPU percentage printed by `devtest` is a scheduler-availability metric, not
+CPU instruction accounting. The program creates a priority -10 task that spins
+continuously. Its `tc_Launch` hook records the EClock when Exec schedules it and
+its `tc_Switch` hook accumulates the elapsed time when Exec schedules another
+task. Reported CPU load is `100 * (total - scheduled_idle) / total`.
+
+An interrupt does not cause a task switch. If a SCSI interrupt arrives while
+the low-priority task is current, the whole interrupt-server copy is included in
+`scheduled_idle`, even though the processor is busy moving every byte. If the
+same interrupt arrives while the device task is current, that time is reported
+as busy. MCDevice starts the CF94 transfer from its task and the board can assert
+INT2 immediately, which accounts for its 100% result. M-Tec's handler can run
+after the benchmark's idle task has become current and therefore reports only
+13% despite its equivalent four-longword CPU copy loop.
+
+At 6 MB/s the four moves per 16 bytes alone require about 1.5 million
+memory-to-memory `move.l` instructions per second. Their nominal 68030 core time
+already exceeds 10 million clocks per second before polling, loop overhead and
+card/RAM wait states. A true 13% CPU cost at 42 MHz is therefore not credible.
+Do not change scheduling merely to improve this reported percentage. Use
+throughput, command latency, maximum vertical-blank gap and integrity as the
+primary measurements; a separate cycle/progress measurement is needed for true
+CPU consumption.
 
 ## Build-time tuning
 
