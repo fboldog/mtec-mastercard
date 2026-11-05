@@ -32,6 +32,12 @@ void *memset(void *d, int c, unsigned long n);
 #ifndef MC_IRQ_ROUNDS
 #define MC_IRQ_ROUNDS 4             /* 32 flag tests, a few us, before leaving */
 #endif
+#if MC_FAST_POLLS < 1
+#error MC_FAST_POLLS must be a positive integer
+#endif
+#if MC_IRQ_ROUNDS < 1
+#error MC_IRQ_ROUNDS must be a positive integer
+#endif
 
 static inline void wr(struct MC *mc, int n, UBYTE v) { REG(mc, n) = v; }
 static inline UBYTE rd(struct MC *mc, int n) { return REG(mc, n); }

@@ -2,11 +2,18 @@
 # Builds mastercard.device with the Bebbo toolchain and the NDK 3.2 headers.
 cd "$(dirname "$0")" || exit 1
 N=${NDK:-$HOME/amiga/AmigaOS/AmigaOS3.2/NDK3.2}
+# These only tune CPU-side waiting. They do not change the CF94's 40 MHz
+# clock. Empty optional values leave esp.c's defaults in effect.
+: "${MC_CPU_MHZ:=42}"
+: "${MC_FAST_POLLS:=}"
+: "${MC_IRQ_ROUNDS:=}"
 # DOCKER=image runs this same script in a toolchain container, for example
 #   DOCKER=stefanreinauer/amiga-gcc:gcc-v16.2 ./build.sh
 if [ -n "$DOCKER" ]; then
     R=$(cd .. && pwd)
     exec docker run --rm -u "$(id -u):$(id -g)" -v "$R:/w" -v "$N:/ndk:ro" -e NDK=/ndk \
+        -e MC_CPU_MHZ="$MC_CPU_MHZ" -e MC_FAST_POLLS="$MC_FAST_POLLS" \
+        -e MC_IRQ_ROUNDS="$MC_IRQ_ROUNDS" \
         -w /w/MCDevice "$DOCKER" ./build.sh
 fi
 PATH=/opt/amiga/bin:$PATH
@@ -15,9 +22,15 @@ python3 ../MTecPatch/gen/genstubs.py "$N" \
     exec=SysBase:FindTask,Forbid,Permit,Disable,Enable,AllocMem,FreeMem,AllocSignal,Signal,Wait,SetSignal,WaitPort,GetMsg,PutMsg,ReplyMsg,AddTask,AddTail,AddHead,Remove,Cause,FindName,OpenLibrary,CloseLibrary,OpenDevice,DoIO,SendIO,CheckIO,WaitIO,AbortIO,AddIntServer,OpenResource,CacheClearU \
     expansion=ExpansionBase:FindConfigDev,MakeDosNode,AddBootNode > gen/stubs.h || exit 1
 # NewList is a macro in amiga.lib, which isn't linked.
-# MC_CPU_MHZ only scales the short task-context interrupt poll. Override it,
-# for example MC_CPU_MHZ=50 ./build.sh, for another accelerator clock.
-: "${MC_CPU_MHZ:=42}"
+# MC_CPU_MHZ scales the default short task-context interrupt poll. The two
+# explicit values are useful for reproducible tuning builds.
+TUNE_DEFS="-DMC_CPU_MHZ=$MC_CPU_MHZ"
+if [ -n "$MC_FAST_POLLS" ]; then
+    TUNE_DEFS="$TUNE_DEFS -DMC_FAST_POLLS=$MC_FAST_POLLS"
+fi
+if [ -n "$MC_IRQ_ROUNDS" ]; then
+    TUNE_DEFS="$TUNE_DEFS -DMC_IRQ_ROUNDS=$MC_IRQ_ROUNDS"
+fi
 # Two variants of the same driver, both named mastercard.device inside:
 #   mastercard.device      moves data with interrupts off (polled), a little faster
 #   mastercard-irq.device  moves data in the INT2 server (-DIRQXFER), so higher
@@ -25,7 +38,7 @@ python3 ../MTecPatch/gen/genstubs.py "$N" \
 for V in "mastercard.device:" "mastercard-irq.device:-DIRQXFER"; do
     m68k-amigaos-gcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
         -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-pointer-sign -Wno-array-bounds \
-        -s -DMC_CPU_MHZ="$MC_CPU_MHZ" ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o ${V%%:*} dev.c esp.c || exit 1
+        -s $TUNE_DEFS ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o ${V%%:*} dev.c esp.c || exit 1
 done
 ls -l mastercard.device mastercard-irq.device
 # The boot ROM, in both variants: rom/MCROM[-irq]-16k.bin for the emulator,
@@ -33,7 +46,7 @@ ls -l mastercard.device mastercard-irq.device
 for V in ":" "-irq:-DIRQXFER"; do
     m68k-amigaos-gcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
         -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-pointer-sign -Wno-array-bounds \
-        -DROM_BUILD -DMC_CPU_MHZ="$MC_CPU_MHZ" ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o rom/driver${V%%:*}.hunk dev.c esp.c || exit 1
+        -DROM_BUILD $TUNE_DEFS ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o rom/driver${V%%:*}.hunk dev.c esp.c || exit 1
     python3 rom/pack.py rom/driver${V%%:*}.hunk rom/diag.s rom/MCROM${V%%:*}-16k.bin rom/MCROM${V%%:*}-27C512.bin || exit 1
 done
 python3 ../MTecPatch/gen/genstubs.py "$N" \

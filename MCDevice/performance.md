@@ -24,6 +24,7 @@ as a comparison.
 | DMA16 | The `$C039` path is correct and fastest among the guaranteed board modes. | Production default. |
 | DMA32 | Skipping every second `$C039` check was about 8% faster in MCDiag, but the flag only guarantees 16 bytes. | Diagnostic experiment only; do not auto-select. |
 | IRQ wait | Small commands normally finish inside the short poll and report zero timer sleeps, so they consume CPU while waiting. | Tune `MC_FAST_POLLS` for throughput versus task responsiveness. |
+| Bulk IRQ behavior | A 64 KiB read normally takes two server entries and zero timer sleeps. M-Tec's disassembled handler uses the same four-longword transfer and a similar run of DREQ tests. | Treat the reported 100% versus M-Tec's 13% CPU as an accounting/scheduling question as well as copy cost. `MC_FAST_POLLS` cannot materially accelerate the bulk inner loop. |
 | Disconnect/reselect | IDENTIFY forbids disconnect and the driver executes one request at a time. | Low priority for one solid-state target; potentially important with multiple targets or mechanical disks. |
 | Synchronous SCSI | MCDevice deliberately selects asynchronous operation. Previous sync tests used the old driver and do not prove MCDevice cannot support it, but they showed FIFO/gross-error risk and no speed gain. | Do not enable until error handling has passed on hardware. Then test offsets 4 and 8 with automatic async fallback. |
 | Write performance | Correctness and restore tests exist, but comparable write-throughput measurements do not. | Add restored-area write timing before tuning the output loop. |
@@ -69,6 +70,18 @@ For a different CPU clock:
 ```sh
 MC_CPU_MHZ=50 ./build.sh
 ```
+
+For a reproducible 42 MHz tuning build, override either CPU-side wait directly:
+
+```sh
+MC_CPU_MHZ=42 MC_FAST_POLLS=1680 MC_IRQ_ROUNDS=4 ./build.sh
+```
+
+`MC_FAST_POLLS` is the task-context wait before using timer.device.
+`MC_IRQ_ROUNDS` is the number of eight-test DREQ polling rounds retained by the
+interrupt server before it returns. Both must be positive integers. The build
+script passes these settings to disk-loaded and ROM variants, and also preserves
+them when `DOCKER=...` is used.
 
 The clock value does not alter CF94 timing registers. Those continue to describe
 the card's 40 MHz SCSI-controller clock.
