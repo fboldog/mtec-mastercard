@@ -19,11 +19,34 @@ void *memset(void *d, int c, unsigned long n);
 #define REG(mc, n) ((mc)->board[MC_REGS + ((n) << 3)])
 #define SPIN_LIMIT 0x00080000UL     /* polls without progress before a DMA chunk gives up, ~0.5 s */
 #define MAX_PHASES 64
-#define FAST_POLLS 4000             /* about 1 ms on a 50 MHz 68030 */
-#define IRQ_ROUNDS 4                /* IRQXFER: 32 flag tests, a few us, before the server leaves */
+
+/* The short wait avoids a timer request and task switch for fast commands.
+   80 polls/MHz preserves the measured ~1 ms window; override either value
+   when building a tuning variant. */
+#ifndef MC_CPU_MHZ
+#define MC_CPU_MHZ 42
+#endif
+#ifndef MC_FAST_POLLS
+#define MC_FAST_POLLS (80UL * MC_CPU_MHZ)
+#endif
+#ifndef MC_IRQ_ROUNDS
+#define MC_IRQ_ROUNDS 4             /* 32 flag tests, a few us, before leaving */
+#endif
 
 static inline void wr(struct MC *mc, int n, UBYTE v) { REG(mc, n) = v; }
 static inline UBYTE rd(struct MC *mc, int n) { return REG(mc, n); }
+
+/* Gross errors mean that the FIFO/DMA path lost its byte count. Parity has a
+   distinct Amiga error code and is checked before gross error in case both
+   bits are latched. The caller resets the bus before returning the error. */
+static LONG chip_error(UBYTE st)
+{
+    if (st & ST_PE)
+        return HFERR_Parity;
+    if (st & ST_GE)
+        return HFERR_DMA;
+    return 0;
+}
 
 /* Interrupt server, called with is_Data in a1. Returns non-zero if the
    interrupt was the chip's. The asm entry turns that into the Z flag. */
@@ -97,7 +120,7 @@ static int wait_int(struct MC *mc, ULONG secs)
        for about a millisecond before paying for a timer request and a task
        switch. Slow ones (seeks, a missing target) still sleep. */
     ULONG k;
-    for (k = 0; k < FAST_POLLS && !mc->ipending; k++)
+    for (k = 0; k < MC_FAST_POLLS && !mc->ipending; k++)
         ;
     if (!mc->ipending) {
         mc->sleeps++;
@@ -121,10 +144,10 @@ void esp_init(struct MC *mc)
 {
     wr(mc, R_CMD, C_RESET);
     wr(mc, R_CMD, C_NOP);
-    wr(mc, R_CFG1, 0x40 | OWN_ID);      /* no interrupt for a SCSI bus reset */
+    wr(mc, R_CFG1, CFG1_DISR | CFG1_PERE | OWN_ID);
     wr(mc, R_CLKCONV, 0);               /* 40 MHz */
     wr(mc, R_TIMEOUT, 0x99);            /* 250 ms select time-out at 40 MHz */
-    wr(mc, R_CFG2, 0x08);               /* SCSI-2 */
+    wr(mc, R_CFG2, CFG2_S2FE | CFG2_ACDPE);
     wr(mc, R_CFG3, 0x18);               /* fast clock */
     wr(mc, R_CFG4, 0x04);               /* active negation */
     wr(mc, R_SYNCPER, 0);
@@ -370,7 +393,7 @@ static ULONG irq_move(struct MC *mc)
         f.buf = x->p;
         f.bursts = x->left >> 4;
         f.stat = &REG(mc, R_STAT);
-        f.limit = IRQ_ROUNDS;           /* rounds of 8 flag tests before leaving */
+        f.limit = MC_IRQ_ROUNDS;        /* rounds of 8 flag tests before leaving */
         if (x->in)
             fast16_in(&f);
         else
@@ -500,7 +523,7 @@ static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     st->stat = x->st.stat;
     st->intr = x->st.intr;
     st->seq = x->st.seq;
-    return 0;
+    return chip_error(x->st.stat);
 }
 #endif
 
@@ -656,7 +679,7 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     st->seq = mc->iseq;
     mc->ipending = 1;
     Enable();
-    return 0;
+    return chip_error(st_);
 }
 
 /* The data phase through the chip's FIFO, without DMA: Transfer Information
@@ -677,6 +700,11 @@ static LONG pio_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
         wr(mc, R_CMD, C_TI);
         if (!wait_int(mc, 5))
             return HFERR_Phase;
+        {
+            LONG err = chip_error(mc->istat);
+            if (err)
+                return err;
+        }
         fifo = rd(mc, R_FFLAGS) & 0x1F;
         st->fflags = fifo;
         if (c->in) {
@@ -746,6 +774,10 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
     }
     for (;;) {
         UBYTE intr = mc->iintr, st = mc->istat;
+        if ((err = chip_error(st))) {
+            esp_busreset(mc);
+            return err;
+        }
         if (intr & IN_DISC)
             return err ? err : HFERR_Phase; /* gone before the status phase */
         if (intr & (IN_ILLEGAL | IN_RESET) || ++phases > MAX_PHASES) {
@@ -770,16 +802,22 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
             wr(mc, R_CMD, C_ICCS);
             if (!wait_int(mc, 5))
                 goto stuck;
+            if ((err = chip_error(mc->istat)))
+                goto chip_failed;
             c->status = rd(mc, R_FIFO);
             (void)rd(mc, R_FIFO);       /* COMMAND COMPLETE */
             wr(mc, R_CMD, C_MSGACC);
             if (!wait_int(mc, 5))
                 goto stuck;
+            if ((err = chip_error(mc->istat)))
+                goto chip_failed;
             return 0;
         case PH_MSGIN:
             wr(mc, R_CMD, C_TI);
             if (!wait_int(mc, 5))
                 goto stuck;
+            if ((err = chip_error(mc->istat)))
+                goto chip_failed;
             (void)rd(mc, R_FIFO);
             wr(mc, R_CMD, C_MSGACC);
             break;
@@ -795,6 +833,9 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
         if (!wait_int(mc, 30))
             goto stuck;
     }
+chip_failed:
+    esp_busreset(mc);
+    return err;
 stuck:
     esp_busreset(mc);
     return HFERR_Phase;

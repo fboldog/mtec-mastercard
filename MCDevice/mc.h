@@ -86,6 +86,13 @@ static inline void NewList(struct List *l)
 #define PH_MSGOUT  6
 #define PH_MSGIN   7
 
+/* Configuration bits used by the driver. */
+#define CFG1_DISR  0x40     /* do not interrupt for a SCSI bus reset */
+#define CFG1_PERE  0x10     /* check and report incoming SCSI parity */
+#define CFG2_ENF   0x40     /* CF94 extensions, including the 24-bit counter */
+#define CFG2_S2FE  0x08     /* SCSI-2 extended messages and group-2 CDBs */
+#define CFG2_ACDPE 0x04     /* abort a command/data phase on a parity error */
+
 /* Interrupt register */
 #define IN_RESET   0x80
 #define IN_ILLEGAL 0x40

@@ -295,8 +295,12 @@ uses M-Tec's code only as a description of the hardware (see `MCDevice/mc.h`):
   goes to INT2.
 - **Data phases:** the chip runs a DMA Transfer Information. The CPU moves 16 bytes
   through the data port at `$F000` each time `$C039` bit 7 is set, then words while
-  `$D039` bit 7 is set. This runs with interrupts off, as M-Tec's code does inside
-  its interrupt.
+  `$D039` bit 7 is set. The polled build does this with interrupts off; the
+  recommended IRQ build does it from the card's INT2 server, so higher-priority
+  interrupts remain available.
+
+Current performance findings and the 42 MHz tuning plan are in
+[`MCDevice/performance.md`](MCDevice/performance.md).
 
 It supports, without a patch:
 - `HD_SCSICMD` with autosense

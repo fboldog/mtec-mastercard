@@ -15,6 +15,9 @@ python3 ../MTecPatch/gen/genstubs.py "$N" \
     exec=SysBase:FindTask,Forbid,Permit,Disable,Enable,AllocMem,FreeMem,AllocSignal,Signal,Wait,SetSignal,WaitPort,GetMsg,PutMsg,ReplyMsg,AddTask,AddTail,AddHead,Remove,Cause,FindName,OpenLibrary,CloseLibrary,OpenDevice,DoIO,SendIO,CheckIO,WaitIO,AbortIO,AddIntServer,OpenResource,CacheClearU \
     expansion=ExpansionBase:FindConfigDev,MakeDosNode,AddBootNode > gen/stubs.h || exit 1
 # NewList is a macro in amiga.lib, which isn't linked.
+# MC_CPU_MHZ only scales the short task-context interrupt poll. Override it,
+# for example MC_CPU_MHZ=50 ./build.sh, for another accelerator clock.
+: "${MC_CPU_MHZ:=42}"
 # Two variants of the same driver, both named mastercard.device inside:
 #   mastercard.device      moves data with interrupts off (polled), a little faster
 #   mastercard-irq.device  moves data in the INT2 server (-DIRQXFER), so higher
@@ -22,7 +25,7 @@ python3 ../MTecPatch/gen/genstubs.py "$N" \
 for V in "mastercard.device:" "mastercard-irq.device:-DIRQXFER"; do
     m68k-amigaos-gcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
         -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-pointer-sign -Wno-array-bounds \
-        -s ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o ${V%%:*} dev.c esp.c || exit 1
+        -s -DMC_CPU_MHZ="$MC_CPU_MHZ" ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o ${V%%:*} dev.c esp.c || exit 1
 done
 ls -l mastercard.device mastercard-irq.device
 # The boot ROM, in both variants: rom/MCROM[-irq]-16k.bin for the emulator,
@@ -30,7 +33,7 @@ ls -l mastercard.device mastercard-irq.device
 for V in ":" "-irq:-DIRQXFER"; do
     m68k-amigaos-gcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
         -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-pointer-sign -Wno-array-bounds \
-        -DROM_BUILD ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o rom/driver${V%%:*}.hunk dev.c esp.c || exit 1
+        -DROM_BUILD -DMC_CPU_MHZ="$MC_CPU_MHZ" ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o rom/driver${V%%:*}.hunk dev.c esp.c || exit 1
     python3 rom/pack.py rom/driver${V%%:*}.hunk rom/diag.s rom/MCROM${V%%:*}-16k.bin rom/MCROM${V%%:*}-27C512.bin || exit 1
 done
 python3 ../MTecPatch/gen/genstubs.py "$N" \
