@@ -78,6 +78,24 @@ the CF94's extended transfer counter to avoid restarting a long data phase every
 64 KiB. The latter must remain an opt-in IRQ-build experiment until it passes
 parity, gross-error, short-transfer and data-integrity tests on the card.
 
+Motorola's MC68030 User's Manual adds the following constraints:
+
+- The instruction tables assume two-clock reads and writes. MasterCard and RAM
+  wait states add directly to the operand reads and writes, so the 28-clock
+  DMA16 figure is only a lower bound.
+- The 68030 data cache is write-through. A cache hit can remove an operand read,
+  but every write still performs an external bus cycle. Consequently a SCSI
+  read must perform both the uncached card-port read and the Fast-RAM write for
+  every longword; cache settings cannot eliminate either half.
+- A SCSI write may benefit from cached or burst reads of sequential Fast RAM if
+  the accelerator memory implements the required synchronous burst handshake.
+  The card-port write remains external. This makes restored-area write timing
+  worth measuring separately rather than assuming read and write symmetry.
+- Card flags and the `$F000` data port are device registers and must be
+  cache-inhibited by the system mapping or hardware `CIIN` signal. Globally
+  clearing or changing the user's caches in the driver is neither necessary nor
+  a valid transfer optimization.
+
 ## Interpreting devtest CPU usage
 
 The CPU percentage printed by `devtest` is a scheduler-availability metric, not
