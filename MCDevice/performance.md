@@ -444,6 +444,25 @@ EClock value. At 50 Hz this clock is coarse, but a legitimate 512 KiB transfer
 at the negotiated 5 MB/s must span at least about five ticks. It does not
 modify the driver or the transfer loop.
 
+The v10 logs are
+[`logs/mcdiag-24-sync-v10-sync.log`](logs/mcdiag-24-sync-v10-sync.log) and
+[`logs/mcdiag-24-sync-v10-read.log`](logs/mcdiag-24-sync-v10-read.log). The
+independent wall clock agrees with the now-stable large-transfer EClock result:
+four byte-exact 512 KiB ENF reads took 112407, 108454, 108613 and 108796 us,
+each spanning five or six 20 ms ticks. Their combined rate was 4672 KiB/s,
+about 95.7% of the negotiated 5.0 MB/s wire rate after converting decimal MB/s
+to KiB/s. The commands remained a single phase with no bursts or Transfer Pad
+(`b0 c1 q0`), and the run completed at 95/0/1. The normal path remained clean
+at 84/0/1 and 5980/5609/4703 KiB/s.
+
+Read-side synchronous transport is therefore correct and near the negotiated
+bus limit for 512 KiB ENF phases. Before normal I/O can enable it, Data-Out
+must be validated. V11 adds a separate opt-in `S:sync-write-test`: it saves one
+block near the end of the medium asynchronously, negotiates sync, writes and
+reads a pattern synchronously, resets the bus to async, then restores and
+verifies the original block asynchronously. The restore path runs after any
+sync write/read failure; the ordinary read-only sync script remains unchanged.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

@@ -378,8 +378,12 @@ checked, and restored.
 
 `Execute S:sync-test` is a separate, experimental read-only test. It asks the
 target for conservative 5 MB/s synchronous transfers at offset 4, compares
-64, 128 and 512 KiB reads, and resets the SCSI bus back to asynchronous mode
-before returning. Normal driver operation never enables sync automatically.
+16- and 24-bit-count reads through 512 KiB, and resets the SCSI bus back to
+asynchronous mode before returning. The validated 512 KiB path reaches about
+4672 KiB/s. `Execute S:sync-write-test` is the separate Data-Out test: it saves
+one block near the end of the medium asynchronously, tests a synchronous write
+and read, then resets to async and restores and verifies the original. Normal
+driver operation never enables sync automatically.
 
 On the real card (A1200, Kickstart 3.0, BlueSCSI Pico, original EPROM with the
 takeover), see `MCDevice/logs/`:

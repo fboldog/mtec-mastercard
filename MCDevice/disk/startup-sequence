@@ -18,3 +18,4 @@ Echo "== done" >>DF0:mcdiag.log
 Echo "Done. The log is DF0:mcdiag.log (More DF0:mcdiag.log)."
 Echo "Optional: Execute S:write-test, which writes near the end of the disk and restores it."
 Echo "Experimental: Execute S:sync-test (read-only 5 MB/s offset-4 sync, then resets async)."
+Echo "After sync read passes: Execute S:sync-write-test (one saved/restored block)."
