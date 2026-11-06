@@ -278,6 +278,26 @@ static void stats(void)
       (ULONG)s->fflags, s->drained, s->stray, s->irqs, s->sleeps, lastus);
 }
 
+static void hex16(char *d, const UBYTE *s)
+{
+    static const char h[] = "0123456789ABCDEF";
+    ULONG i;
+    for (i = 0; i < 16; i++) {
+        d[i * 3] = h[s[i] >> 4];
+        d[i * 3 + 1] = h[s[i] & 15];
+        d[i * 3 + 2] = i == 15 ? 0 : ' ';
+    }
+}
+
+static void sync_diff_bytes(void)
+{
+    char r[48], g[48];
+    hex16(r, ref);
+    hex16(g, got);
+    P("SYNC first16 ref  %s\n", (ULONG)r);
+    P("SYNC first16 got  %s\n", (ULONG)g);
+}
+
 /* The normal mode (DMA16) into ref, then the others into got, compared with
    ref. align puts the data at got+align, with guard bytes around it. */
 static const UBYTE order[MCMODES_STD] = { MCMODE_DMA16, MCMODE_DMA8, MCMODE_WORD, MCMODE_PIO };
@@ -760,6 +780,39 @@ static void sync_tests(void)
     P("SYNC negotiated     factor %lu offset %lu, CF94 period %lu (~%lu KB/s bus)\n",
       (ULONG)sr.period, (ULONG)sr.offset, (ULONG)sr.chip_period,
       sr.period ? 250000UL / sr.period : 0);
+
+    /* Offset four cannot guarantee the board's 16-byte-ready condition. Test
+       the word-ready handshake alone before allowing any burst-mode probe. */
+    len = 0x200;
+    nb = len / bsize;
+    cdb[7] = nb >> 8;
+    cdb[8] = nb;
+    memset(got, 0x5A, len + 16);
+    e = run(MCMODE_WORD, cdb, 10, 1, got, len);
+    bad = 0;
+    if (!e && !dr.status && dr.actual == len) {
+        for (i = 0; i < len && got[i] == ref[i]; i++) ;
+        if (i != len)
+            bad = i + 1;
+        else for (i = len; i < len + 16; i++)
+            if (got[i] != 0x5A) {
+                bad = i + 1;
+                break;
+            }
+    }
+    if (e || dr.status || dr.actual != len)
+        P("SYNC WORD  512 B ERR %ld %lu/%lu s%02lx", e, dr.actual, len, (ULONG)dr.status);
+    else if (bad) {
+        P("SYNC WORD  512 B DIFF/OVER @%lx\n", bad - 1);
+        sync_diff_bytes();
+    } else {
+        oks++;
+        P("SYNC WORD  512 B same");
+    }
+    stats();
+    if (e || dr.status || dr.actual != len || bad)
+        goto restore_sync;
+
     for (k = 0; k < sizeof sizes / sizeof sizes[0]; k++) {
         len = sizes[k];
         nb = len / bsize;
@@ -788,9 +841,10 @@ static void sync_tests(void)
         }
         if (e || dr.status || dr.actual != len)
             P("SYNC %7lu B x4 ERR %ld %lu/%lu s%02lx", len, e, dr.actual, len, (ULONG)dr.status);
-        else if (bad)
-            P("SYNC %7lu B x4 DIFF/OVER @%lx", len, bad - 1);
-        else {
+        else if (bad) {
+            P("SYNC %7lu B x4 DIFF/OVER @%lx\n", len, bad - 1);
+            sync_diff_bytes();
+        } else {
             oks++;
             P("SYNC %7lu B x4 same %lu KB/s, VBlank gap max %lu us", len,
               dt ? (len >> 10) * 4 * efreq / dt : 0, vbmax);
@@ -799,6 +853,7 @@ static void sync_tests(void)
         if (e || dr.status || dr.actual != len || bad)
             break;
     }
+restore_sync:
     e = sync_control(0, 0, &sr);
     P("SYNC async restore  %s\n", (ULONG)(e ? "FAILED" : "ok (SCSI bus reset)"));
 }

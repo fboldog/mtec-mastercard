@@ -310,6 +310,26 @@ timeout, and the existing bus-reset failure path. It does not enlarge or write
 past the caller's buffer, and the asynchronous reference comparison still
 validates the original 512 bytes.
 
+The v4 log is
+[`logs/mcdiag-18-sync-v4-sync.log`](logs/mcdiag-18-sync-v4-sync.log), with the
+matching ordinary run in
+[`logs/mcdiag-18-sync-v4-read.log`](logs/mcdiag-18-sync-v4-read.log). The
+ordinary path remained clean at 84/0/1 and 5969/5620/4618 KiB/s. In this build
+the phase had already advanced by the post-Interrupt sample (`st91>13`), so
+Transfer Pad was not needed (`q0`). The 512-byte command completed in 2321 us,
+but its data first differed from the asynchronous reference at byte offset 4,
+exactly the negotiated synchronous offset.
+
+This makes controller status handling secondary to payload integrity. Offset
+four cannot continuously fill the board's 16-byte-ready window, and the first
+failure occurring at that boundary points at the mixed initial-burst/word path.
+The next diagnostic first performs one 512-byte synchronous read using only the
+word-ready handshake and logs the first 16 reference and received bytes on any
+mismatch. It attempts the existing DMA16 test only if that conservative WORD
+read is exact. This distinguishes a burst-window violation from corruption in
+the underlying synchronous/DACK path without increasing the tested transfer
+size.
+
 The sync log's three pre-test failures were unrelated: REQUEST SENSE returned
 pending sense data once and cleared it, so the three following calls correctly
 returned different bytes. MCDiag now runs this state-consuming command only
