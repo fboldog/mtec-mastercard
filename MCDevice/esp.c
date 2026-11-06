@@ -502,8 +502,10 @@ static ULONG current_count(struct MC *mc, int extended)
 /* Moves what the board offers now; returns the bytes moved.  A $C039 sample
    cannot authorize a 16-byte synchronous burst: with offset four, hardware
    tests found the first longword correct and corruption immediately after it.
-   Recheck $C039 before every single longword, never moving more than the
-   negotiated offset.  Fall back to the word-ready path because a synchronous
+   Consume at most the negotiated offset, rounded down to four bytes and
+   capped at twelve, from each fresh $C039 sample.  This preserves the proven
+   offset-four path while testing whether larger offsets safely authorize two
+   or three longwords.  Fall back to the word-ready path because a synchronous
    target may have fewer than four REQs outstanding.  Leaving a ready word on
    the board holds INT2 asserted and traps the machine in the level-2 chain. */
 static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
@@ -512,7 +514,7 @@ static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
     volatile UBYTE *f16 = mc->board + MC_DREQ16, *fw = mc->board + MC_DREQW;
     volatile ULONG *pl = (volatile ULONG *)(mc->board + MC_PORT);
     volatile UWORD *pw = (volatile UWORD *)(mc->board + MC_PORT);
-    ULONG start = x->left;
+    ULONG start = x->left, n;
     UBYTE ready16;
 
     if (!x->sync && x->left >= 16 && (*f16 & 0x80)) {
@@ -539,13 +541,21 @@ static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
     while (x->left) {
         ready16 = *f16;
         if (x->sync >= 4 && x->left >= 4 && (ready16 & 0x80)) {
-            if (x->in)
-                *(ULONG *)x->p = *pl;
-            else
-                *pl = *(ULONG *)x->p;
-            x->p += 4;
-            x->left -= 4;
-            x->st.longs++;
+            n = x->sync & ~3;
+            if (n > 12)
+                n = 12;
+            if (n > x->left)
+                n = x->left & ~3;
+            do {
+                if (x->in)
+                    *(ULONG *)x->p = *pl;
+                else
+                    *pl = *(ULONG *)x->p;
+                x->p += 4;
+                x->left -= 4;
+                x->st.longs++;
+                n -= 4;
+            } while (n);
             continue;
         }
         if (!((ready16 | *fw) & 0x80))

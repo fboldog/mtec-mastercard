@@ -590,6 +590,23 @@ longwords without restoring the corrupt 16-byte burst. V18 adds a read-only
 factor-50 offset ladder (4, 8, 12 and 15), resetting to async and checking two
 individually poisoned 512 KiB buffers after each step.
 
+The v18 result is
+[`logs/mcdiag-32-sync-v18-offset.log`](logs/mcdiag-32-sync-v18-offset.log).
+BlueSCSI accepted every requested offset, all eight 512 KiB reads were
+byte-exact, every asynchronous reset succeeded, and the run finished at
+88/0/1. Larger offsets did not change the mover at all: offsets 4, 8, 12 and
+15 each used exactly `l32768 w196608`. Throughput remained dominated by the
+same implausibly alternating short/long timing samples, so no offset was a
+measurable winner.
+
+The counts show why: rechecking `$C039` after every longword makes the mover
+safe but the flag drops after that first four-byte access regardless of the
+negotiated offset. V19 tests a still-bounded interpretation of the earlier v5
+failure boundary. One fresh `$C039` sample may authorize no more than the
+negotiated offset, rounded down to a longword: 4, 8 or 12 bytes, never the old
+unsafe 16-byte burst. The same read-only offset ladder will stop immediately
+if that scaling assumption is wrong.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately
