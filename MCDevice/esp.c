@@ -44,14 +44,14 @@ void *memset(void *d, int c, unsigned long n);
 static inline void wr(struct MC *mc, int n, UBYTE v) { REG(mc, n) = v; }
 static inline UBYTE rd(struct MC *mc, int n) { return REG(mc, n); }
 
-/* Gross errors mean that the FIFO/DMA path lost its byte count. Parity has a
-   distinct Amiga error code and is checked before gross error in case both
-   bits are latched. The caller resets the bus before returning the error. */
+/* Illegal-operation errors include FIFO overflow, mismatched DMA direction
+   and an overwritten command register. Parity has a distinct Amiga error
+   code. The caller resets the bus before returning either error. */
 static LONG chip_error(UBYTE st)
 {
     if (st & ST_PE)
         return HFERR_Parity;
-    if (st & ST_GE)
+    if (st & ST_IOE)
         return HFERR_DMA;
     return 0;
 }
@@ -885,6 +885,7 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
     UWORD k;
     int phases = 0;
     int extended = c->mode == MCMODE_EXT24;
+    int manual_cdb = c->cdblen > 12;
     LONG err = 0;
 
     c->actual = 0;
@@ -900,9 +901,16 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
     wr(mc, R_SYNCPER, 0);
     wr(mc, R_SYNCOFF, 0);
     wr(mc, R_FIFO, 0x80 | lun);         /* IDENTIFY, no disconnection */
-    for (k = 0; k < c->cdblen; k++)
-        wr(mc, R_FIFO, c->cdb[k]);
-    wr(mc, R_CMD, C_SELATN);
+    if (manual_cdb) {
+        /* IDENTIFY plus a 16-byte CDB cannot fit in the 16-byte FIFO, and
+           CF94 selection steps treat group-4 commands as six bytes.  Stop
+           after IDENTIFY and send the CDB explicitly in command phase. */
+        wr(mc, R_CMD, C_SELATNS);
+    } else {
+        for (k = 0; k < c->cdblen; k++)
+            wr(mc, R_FIFO, c->cdb[k]);
+        wr(mc, R_CMD, C_SELATN);
+    }
     if (!wait_int(mc, 2)) {
         esp_init(mc);
         return HFERR_SelTimeout;
@@ -972,7 +980,18 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
             wr(mc, R_FIFO, 0x08);       /* NO OPERATION */
             wr(mc, R_CMD, C_TI);
             break;
-        default:                        /* command phase again, or reserved */
+        case PH_CMD:
+            if (!manual_cdb) {
+                esp_busreset(mc);
+                return HFERR_Phase;
+            }
+            wr(mc, R_CMD, C_FLUSH);
+            for (k = 0; k < c->cdblen; k++)
+                wr(mc, R_FIFO, c->cdb[k]);
+            manual_cdb = 0;
+            wr(mc, R_CMD, C_TI);
+            break;
+        default:                        /* reserved phase */
             esp_busreset(mc);
             return HFERR_Phase;
         }

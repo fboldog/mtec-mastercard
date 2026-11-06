@@ -71,11 +71,12 @@ static inline void NewList(struct List *l)
 #define C_MSGACC   0x12
 #define C_SETATN   0x1A
 #define C_SELATN   0x42
+#define C_SELATNS  0x43     /* select with ATN and stop after IDENTIFY */
 #define C_DMA      0x80
 
 /* Status register */
 #define ST_INT     0x80
-#define ST_GE      0x40
+#define ST_IOE     0x40     /* illegal operation: FIFO/direction/command error */
 #define ST_PE      0x20
 #define ST_TC      0x10
 #define ST_PHASE   0x07

@@ -303,7 +303,8 @@ Current performance findings and the 42 MHz tuning plan are in
 [`MCDevice/performance.md`](MCDevice/performance.md).
 
 It supports, without a patch:
-- `HD_SCSICMD` with autosense
+- `HD_SCSICMD` with autosense, including 16-byte CDBs sent in a separate
+  command phase because IDENTIFY plus 16 bytes cannot fit in the CF94 FIFO
 - TD64, NSD and ETD commands, the ETD ones checking the change count
 - reads and writes up to 2 TB
 - `TD_GETGEOMETRY`, `TD_EJECT`, `TD_CHANGESTATE` and NSD device query

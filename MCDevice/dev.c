@@ -265,6 +265,10 @@ static void scsicmd(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
         ior->io_Error = IOERR_BADLENGTH;
         return;
     }
+    if (!sc->scsi_Command || !sc->scsi_CmdLength || sc->scsi_CmdLength > 16) {
+        ior->io_Error = IOERR_BADLENGTH;
+        return;
+    }
     c.cdb = sc->scsi_Command;
     c.cdblen = sc->scsi_CmdLength;
     c.in = sc->scsi_Flags & SCSIF_READ;

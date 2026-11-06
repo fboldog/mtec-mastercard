@@ -18,9 +18,9 @@ as a comparison.
 
 | Item | Finding | Status |
 |---|---|---|
-| CF94 error handling | Gross and parity status bits were recorded but ignored. Parity reporting was disabled. This made sync or aggressive DMA experiments unsafe. | Implemented on this branch, with real-hardware validation pending: parity reporting and abort-on-parity are enabled; parity returns `HFERR_Parity`, gross error returns `HFERR_DMA`, and the bus is reset. |
+| CF94 error handling | Illegal-operation and parity status bits were recorded but ignored. Parity reporting was disabled. This made sync or aggressive DMA experiments unsafe. | Parity reporting and abort-on-parity are enabled; parity returns `HFERR_Parity`, illegal operation returns `HFERR_DMA`, and the bus is reset. Hardware testing exposed and localized the pre-existing 16-byte-CDB FIFO overflow. |
 | Short interrupt poll | `FAST_POLLS=4000` represented about 1 ms at 50 MHz, but was machine-specific. | It is now `80 * MC_CPU_MHZ`, with a 42 MHz default (3360 polls) and build-time overrides. |
-| DMA transfer count | The normal path uses 16 bits and restarts the data phase every 64 KiB. AMD documents a 24-bit counter behind `CFG2.ENF`, loaded after DMA NOP. | Private MCDiag mode `EXT24`, capped at 512 KiB. The matched-size run measured +1.8%, -0.2% and +3.5% at 128, 256 and 512 KiB, but the following 16-byte CDB failed. It remains diagnostic and is not selected automatically. |
+| DMA transfer count | The normal path uses 16 bits and restarts the data phase every 64 KiB. AMD documents a 24-bit counter behind `CFG2.ENF`, loaded after DMA NOP. | Private MCDiag mode `EXT24`, capped at 512 KiB. Two matched-size runs show a small, variable benefit averaging about 2%. It remains diagnostic pending a completely regression-free run and is not selected automatically. |
 | DMA16 | The `$C039` path is correct and fastest among the guaranteed board modes. | Production default. |
 | DMA32 | Skipping every second `$C039` check was about 8% faster in MCDiag, but the flag only guarantees 16 bytes. | Diagnostic experiment only; do not auto-select. |
 | Original-ROM loop | M-Tec omits MCDevice's software burst bound and trusts the CF94 counter. This removes `subq`/`beq` from each 16 bytes but a stuck DREQ could overwrite memory. | Rejected for production. In the fair IRQ comparison it measured 3844 KiB/s against DMA16's 3841 KiB/s: no useful gain for losing the software bound. |
@@ -29,7 +29,7 @@ as a comparison.
 | Bulk IRQ behavior | A 64 KiB read normally takes two server entries and zero timer sleeps. M-Tec's disassembled handler uses the same four-longword transfer and a similar run of DREQ tests. | `MC_FAST_POLLS` cannot materially accelerate the bulk inner loop. |
 | IRQ duration | Exec recommends deferring lengthy interrupt work, but the board holds INT2 active while DREQ is asserted. Returning without moving the data would immediately retrigger the PORTS interrupt, and the byte-exact original-ROM disassembly uses no mask or acknowledge register. | Keep the IRQ copy. A software interrupt alone does not solve this; a card-local mask would require new hardware evidence. |
 | Disconnect/reselect | IDENTIFY forbids disconnect and the driver executes one request at a time. | Low priority for one solid-state target; potentially important with multiple targets or mechanical disks. |
-| Synchronous SCSI | MCDevice deliberately selects asynchronous operation. Previous sync tests used the old driver and do not prove MCDevice cannot support it, but they showed FIFO/gross-error risk and no speed gain. | Do not enable until error handling has passed on hardware. Then test offsets 4 and 8 with automatic async fallback. |
+| Synchronous SCSI | MCDevice deliberately selects asynchronous operation. Previous sync tests used the old driver and do not prove MCDevice cannot support it, but they showed FIFO/illegal-operation risk and no speed gain. | Do not enable until error handling has passed on hardware. Then test offsets 4 and 8 with automatic async fallback. |
 | Write performance | Correctness and restore tests exist, but comparable write-throughput measurements do not. | Add restored-area write timing before tuning the output loop. |
 
 ## Initial 42 MHz tuning matrix
@@ -79,7 +79,7 @@ therefore unlikely to produce a material gain. The remaining safe opportunities
 are outside the four-move kernel: reduce avoidable DREQ/status accesses and use
 the CF94's extended transfer counter to avoid restarting a long data phase every
 64 KiB. The latter must remain an opt-in IRQ-build experiment until it passes
-parity, gross-error, short-transfer and data-integrity tests on the card.
+parity, illegal-operation, short-transfer and data-integrity tests on the card.
 
 The combined `dbpl` formulation was already measured in run 5, including a
 four-`move.l` comparison, and was 3-5% slower. The flag commonly drops while
@@ -129,17 +129,35 @@ completed with 86 passes, no failures and one unsupported buffer-command skip.
 | 512 KiB | 5606 KiB/s | 5804 KiB/s | +3.5% |
 
 The ordinary devtest 512 KiB path reached 5877 KiB/s in the same run, so EXT24
-has not established a throughput advantage. More importantly, the following
-`READ_CAPACITY_16` again returned `HFERR_DMA`. ENF changes status-phase latching
-as well as enabling the high counter byte. The experiment had cleared ENF as
-soon as its data phase ended, part-way through the SCSI command. The next build
-keeps ENF stable until status and command-complete have finished and adds a
-post-EXT READ CAPACITY(16) check.
+had not yet established a throughput advantage. More importantly, the following
+`READ_CAPACITY_16` again returned `HFERR_DMA`.
 
-The fair IRQ ROM16 result was 3844 KiB/s against 3841 KiB/s for bounded DMA16,
-a difference of 0.08%. ROM16 is therefore not a useful optimization. The safe
-ready-entry changes remain: they avoid one known-ready DREQ read, save only the
-registers used by the loop, and return the already-sampled chip status.
+### ENF-lifetime and 16-byte-CDB run
+
+The third capture is in
+[`logs/mcdiag-12-perf-enf-lifetime.log`](logs/mcdiag-12-perf-enf-lifetime.log).
+Keeping ENF stable through command-complete did not fix READ CAPACITY(16): the
+new immediate check failed before entering a data phase, and devtest reproduced
+it. The EXT24 comparisons themselves all passed and were about 2% faster:
+
+| Size | DMA16 | EXT24 | EXT24 difference |
+|---:|---:|---:|---:|
+| 128 KiB | 5377 KiB/s | 5525 KiB/s | +2.8% |
+| 256 KiB | 5560 KiB/s | 5682 KiB/s | +2.2% |
+| 512 KiB | 5561 KiB/s | 5672 KiB/s | +2.0% |
+
+The failure was introduced before EXT24, when the driver began treating CF94
+status bit 6 as fatal. AMD calls that bit Illegal Operation Error, not Gross
+Error; FIFO overflow is one documented cause. MCDevice put IDENTIFY plus a
+16-byte group-4 CDB into the chip's 16-byte FIFO, while the CF94 selection steps
+only recognize group 4 as a reserved six-byte command. Earlier builds ignored
+the resulting error. The corrected path uses Select with ATN and Stop, sends a
+NO OPERATION message, and transfers the 16-byte CDB separately in command phase.
+
+The two fair IRQ ROM16 runs differed from bounded DMA16 by 0.08% and 1.7%.
+That small, unstable gain does not justify removing the software buffer bound.
+The safe ready-entry changes remain: they avoid one known-ready DREQ read, save
+only the registers used by the loop, and return the already-sampled chip status.
 
 Motorola's MC68030 User's Manual adds the following constraints:
 
