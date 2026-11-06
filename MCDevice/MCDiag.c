@@ -13,9 +13,9 @@
  * the end.
  *
  * A speed section times 16 reads of 64 KB per mode and one-block commands,
- * with the longest gap between vertical blank interrupts during the reads
- * (20 ms on PAL when nothing holds interrupts off), and two read comparisons: DMA32 (32 bytes per flag, faster but only safe
- * if the board holds 32 bytes) and MOVEM (DMA16 read with movem.l). They only report; they don't count as failures.
+ * with the longest gap between vertical blank interrupts during the reads.
+ * DMA32, MOVEM, ROM16 (the original unbounded loop) and EXT24 (one DMA phase
+ * up to 1 MiB) are comparisons only; they don't count as failures.
  *
  * Read-only unless WRITE is given. The buffer tests write the drive's own
  * buffer (WRITE BUFFER / READ BUFFER), not the medium. WRITE adds medium
@@ -60,7 +60,8 @@ LONG start(void);
 static const char vers[] __attribute__((used)) = "$VER: MCDiag 0.1 (4.11.2026)";
 
 #define DEV_NAME "mastercard.device"
-#define BUFSIZE  (0x10000 + 0x1000 + 16)
+#define BUFSIZE     (0x10000 + 0x1000 + 16)
+#define BIGBUFSIZE  (0x100000 + 0x1000 + 16)
 #define PIO_MAX  4096    /* longest PIO transfer worth waiting for */
 
 static BPTR logfh;
@@ -68,10 +69,13 @@ static ULONG fails, oks, skips;
 static struct MsgPort port;
 static struct IOStdReq io;
 static UBYTE *ref, *got, *save;
+static ULONG workbufsize;
 static ULONG bsize, blocks;
 static UBYTE devtype;
 static UBYTE skipmode[MCMODES];
-static const char *mname[MCMODES] = { "DMA16", "DMA8", "WORD", "PIO", "DMA32", "MOVEM" };
+static const char *mname[MCMODES] = {
+    "DMA16", "DMA8", "WORD", "PIO", "DMA32", "MOVEM", "ROM16", "EXT24"
+};
 
 __attribute__((used)) void *memset(void *d, int c, unsigned long n)
 {
@@ -531,11 +535,13 @@ static ULONG vb_stop(void)
 }
 
 /* Speed: 16 reads of 64 KB in each mode, timed by the EClock, each checked
-   against a DMA16 read; then the time of one command, from 64 reads of one
-   block. DMA32 and MOVEM are comparisons, see the top. */
+   against a DMA16 read; an extended-count sweep; then small-command time.
+   The experimental modes only report. */
 static void speed_tests(void)
 {
-    static const UBYTE modes[] = { MCMODE_DMA16, MCMODE_DMA8, MCMODE_WORD, MCMODE_DMA32, MCMODE_MOVEM };
+    static const UBYTE modes[] = {
+        MCMODE_DMA16, MCMODE_DMA8, MCMODE_WORD, MCMODE_DMA32, MCMODE_MOVEM, MCMODE_ROM16
+    };
     UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     ULONG len = 0x10000, n = len / bsize, k, i, j, t0, dt, vbmax;
 
@@ -548,6 +554,7 @@ static void speed_tests(void)
     P("SPEED idle         VBlank gap max %lu us\n", vb_stop());
     cdb[7] = n >> 8;
     cdb[8] = n;
+    memset(ref, 0xA5, len + 16);
     if (run(MCMODE_DMA16, cdb, 10, 1, ref, len) || dr.status || dr.actual != len) {
         P("SPEED              skipped: the reference read failed\n");
         skips++;
@@ -558,6 +565,7 @@ static void speed_tests(void)
         ULONG bad = 0, err = 0;
         if (skipmode[m])
             continue;
+        memset(got, 0x5A, len + 16);
         vb_start();
         t0 = now();
         for (j = 0; j < 16; j++) {
@@ -573,6 +581,8 @@ static void speed_tests(void)
         }
         dt = now() - t0;
         vbmax = vb_stop();
+        if (!bad && got[len] != 0x5A)
+            bad = len + 1;
         if (err) {
             if (m < MCMODES_STD)
                 fails++;                /* the experiments only report */
@@ -588,6 +598,54 @@ static void speed_tests(void)
                 oks++;
                 P("SPEED 64K x16      %-5s same %lu KB/s, %lu us per 64 KB, VBlank gap max %lu us", (ULONG)mname[m],
                   dt ? 1024 * efreq / dt : 0, ticks_us(dt) / 16, vbmax);
+            }
+            stats();
+        }
+    }
+    {
+        /* EXT24 is deliberately separate: its benefit is avoiding the 64 KiB
+           phase restarts, so compare it at 128 KiB through 1 MiB. */
+        static const ULONG sizes[] = { 0x20000, 0x40000, 0x80000, 0x100000 };
+        if (workbufsize < 0x100000 + 16) {
+            P("EXT24 sweep       skipped: large test buffers unavailable\n");
+            skips++;
+        } else for (k = 0; k < sizeof sizes / sizeof sizes[0]; k++) {
+            ULONG nb, bad = 0, err = 0;
+            len = sizes[k];
+            nb = len / bsize;
+            cdb[7] = nb >> 8;
+            cdb[8] = nb;
+            memset(ref, 0xA5, len + 16);
+            if (run(MCMODE_DMA16, cdb, 10, 1, ref, len) || dr.status || dr.actual != len || ref[len] != 0xA5) {
+                P("EXT24 %7lu B     reference failed, skipped\n", len);
+                skips++;
+                continue;
+            }
+            memset(got, 0x5A, len + 16);
+            vb_start();
+            t0 = now();
+            for (j = 0; j < 4; j++)
+                if (run(MCMODE_EXT24, cdb, 10, 1, got, len) || dr.status || dr.actual != len) {
+                    err++;
+                    break;
+                }
+            dt = now() - t0;
+            vbmax = vb_stop();
+            if (!err) {
+                for (i = 0; i < len && got[i] == ref[i]; i++) ;
+                if (i != len)
+                    bad = i + 1;
+                else if (got[len] != 0x5A)
+                    bad = len + 1;
+            }
+            if (err)
+                P("EXT24 %7lu B x4  ERR %ld %lu/%lu", len, dr.err, dr.actual, len);
+            else if (bad)
+                P("EXT24 %7lu B x4  DIFF/OVER @%lx", len, bad - 1);
+            else {
+                oks++;
+                P("EXT24 %7lu B x4  same %lu KB/s, VBlank gap max %lu us", len,
+                  dt ? (len >> 10) * 4 * efreq / dt : 0, vbmax);
             }
             stats();
         }
@@ -734,8 +792,17 @@ LONG start(void)
         TimerBase = treq.tr_node.io_Device;
         efreq = ReadEClock(&ev);
     }
-    ref = (UBYTE *)AllocMem(BUFSIZE, MEMF_PUBLIC);
-    got = (UBYTE *)AllocMem(BUFSIZE, MEMF_PUBLIC);
+    workbufsize = BIGBUFSIZE;
+    ref = (UBYTE *)AllocMem(workbufsize, MEMF_PUBLIC);
+    got = (UBYTE *)AllocMem(workbufsize, MEMF_PUBLIC);
+    if (!ref || !got) {
+        if (ref) FreeMem(ref, workbufsize);
+        if (got) FreeMem(got, workbufsize);
+        ref = got = 0;
+        workbufsize = BUFSIZE;
+        ref = (UBYTE *)AllocMem(workbufsize, MEMF_PUBLIC);
+        got = (UBYTE *)AllocMem(workbufsize, MEMF_PUBLIC);
+    }
     save = (UBYTE *)AllocMem(BUFSIZE, MEMF_PUBLIC);
     if (!ref || !got || !save) {
         P("No memory\n");
@@ -758,8 +825,8 @@ LONG start(void)
     P("\nRESULT %lu ok, %lu failed, %lu skipped\n", oks, fails, skips);
     rc = fails ? RETURN_ERROR : RETURN_OK;
 done:
-    if (ref) FreeMem(ref, BUFSIZE);
-    if (got) FreeMem(got, BUFSIZE);
+    if (ref) FreeMem(ref, workbufsize);
+    if (got) FreeMem(got, workbufsize);
     if (save) FreeMem(save, BUFSIZE);
     if (TimerBase) CloseDevice((struct IORequest *)&treq);
     if (logfh) Close(logfh);

@@ -19,6 +19,8 @@ void *memset(void *d, int c, unsigned long n);
 #define REG(mc, n) ((mc)->board[MC_REGS + ((n) << 3)])
 #define SPIN_LIMIT 0x00080000UL     /* polls without progress before a DMA chunk gives up, ~0.5 s */
 #define MAX_PHASES 64
+#define MAX_EXT_PHASE 0x00100000UL  /* diagnostic 24-bit phases stop at 1 MiB */
+#define CFG2_NORMAL (CFG2_S2FE | CFG2_ACDPE)
 
 /* The short wait avoids a timer request and task switch for fast commands.
    80 polls/MHz preserves the measured ~1 ms window; override either value
@@ -153,7 +155,7 @@ void esp_init(struct MC *mc)
     wr(mc, R_CFG1, CFG1_DISR | CFG1_PERE | OWN_ID);
     wr(mc, R_CLKCONV, 0);               /* 40 MHz */
     wr(mc, R_TIMEOUT, 0x99);            /* 250 ms select time-out at 40 MHz */
-    wr(mc, R_CFG2, CFG2_S2FE | CFG2_ACDPE);
+    wr(mc, R_CFG2, CFG2_NORMAL);
     wr(mc, R_CFG3, 0x18);               /* fast clock */
     wr(mc, R_CFG4, 0x04);               /* active negation */
     wr(mc, R_SYNCPER, 0);
@@ -187,16 +189,30 @@ struct Fast {
     ULONG bursts;
     volatile UBYTE *stat;
     ULONG limit;
+    UBYTE status;                  /* status sampled by the assembly loop, or 0 */
 };
 void fast16_in(struct Fast *f __asm("a0"));     /* four move.l per flag */
 void fast16_out(struct Fast *f __asm("a0"));
+void fast16_in_ready(struct Fast *f __asm("a0")); /* IRQ already observed $C039 */
+void fast16_out_ready(struct Fast *f __asm("a0"));
 void fast32_in(struct Fast *f __asm("a0"));     /* MCMODE_DMA32: 32 bytes per flag */
 void movem16_in(struct Fast *f __asm("a0"));    /* MCMODE_MOVEM: two movem.l per flag */
+void rom16_in(struct Fast *f __asm("a0"));      /* original ROM: CF94 count is the bound */
 __asm(
 "  .text\n"
+"  .globl _fast16_in_ready\n"
+"  _fast16_in_ready:\n"
+"  movem.l d2/a2-a5,-(sp)\n"
+"  movem.l (a0),a2-a4\n"
+"  move.l 12(a0),d0\n"
+"  movea.l 16(a0),a5\n"
+"  move.l 20(a0),d1\n"
+"  tst.l d0\n"
+"  beq.s 9f\n"
+"  bra.s 3f\n"
 "  .globl _fast16_in\n"
 "  _fast16_in:\n"
-"  movem.l d2-d6/a2-a5,-(sp)\n"
+"  movem.l d2/a2-a5,-(sp)\n"
 "  movem.l (a0),a2-a4\n"
 "  move.l 12(a0),d0\n"
 "  movea.l 16(a0),a5\n"
@@ -220,8 +236,11 @@ __asm(
 "  bmi.s 3f\n"
 "  tst.b (a2)\n"
 "  bmi.s 3f\n"
-"  tst.b (a5)\n"
-"  bmi.s 9f\n"
+"  move.b (a5),d1\n"
+"  bpl.s 4f\n"
+"  move.b d1,24(a0)\n"
+"  bra.s 9f\n"
+"  4:move.l 20(a0),d1\n"
 "  subq.l #1,d2\n"
 "  bne.s 2b\n"
 "  bra.s 9f\n"
@@ -236,11 +255,21 @@ __asm(
 "  bra.s 1b\n"
 "  9:move.l a4,8(a0)\n"
 "  move.l d0,12(a0)\n"
-"  movem.l (sp)+,d2-d6/a2-a5\n"
+"  movem.l (sp)+,d2/a2-a5\n"
 "  rts\n"
+"  .globl _fast16_out_ready\n"
+"  _fast16_out_ready:\n"
+"  movem.l d2/a2-a5,-(sp)\n"
+"  movem.l (a0),a2-a4\n"
+"  move.l 12(a0),d0\n"
+"  movea.l 16(a0),a5\n"
+"  move.l 20(a0),d1\n"
+"  tst.l d0\n"
+"  beq.s 9f\n"
+"  bra.s 3f\n"
 "  .globl _fast16_out\n"
 "  _fast16_out:\n"
-"  movem.l d2-d6/a2-a5,-(sp)\n"
+"  movem.l d2/a2-a5,-(sp)\n"
 "  movem.l (a0),a2-a4\n"
 "  move.l 12(a0),d0\n"
 "  movea.l 16(a0),a5\n"
@@ -264,8 +293,11 @@ __asm(
 "  bmi.s 3f\n"
 "  tst.b (a2)\n"
 "  bmi.s 3f\n"
-"  tst.b (a5)\n"
-"  bmi.s 9f\n"
+"  move.b (a5),d1\n"
+"  bpl.s 4f\n"
+"  move.b d1,24(a0)\n"
+"  bra.s 9f\n"
+"  4:move.l 20(a0),d1\n"
 "  subq.l #1,d2\n"
 "  bne.s 2b\n"
 "  bra.s 9f\n"
@@ -280,11 +312,11 @@ __asm(
 "  bra.s 1b\n"
 "  9:move.l a4,8(a0)\n"
 "  move.l d0,12(a0)\n"
-"  movem.l (sp)+,d2-d6/a2-a5\n"
+"  movem.l (sp)+,d2/a2-a5\n"
 "  rts\n"
 "  .globl _fast32_in\n"
 "  _fast32_in:\n"
-"  movem.l d2-d6/a2-a5,-(sp)\n"
+"  movem.l d2/a2-a5,-(sp)\n"
 "  movem.l (a0),a2-a4\n"
 "  move.l 12(a0),d0\n"
 "  movea.l 16(a0),a5\n"
@@ -308,8 +340,11 @@ __asm(
 "  bmi.s 3f\n"
 "  tst.b (a2)\n"
 "  bmi.s 3f\n"
-"  tst.b (a5)\n"
-"  bmi.s 9f\n"
+"  move.b (a5),d1\n"
+"  bpl.s 4f\n"
+"  move.b d1,24(a0)\n"
+"  bra.s 9f\n"
+"  4:move.l 20(a0),d1\n"
 "  subq.l #1,d2\n"
 "  bne.s 2b\n"
 "  bra.s 9f\n"
@@ -328,7 +363,7 @@ __asm(
 "  bra.s 1b\n"
 "  9:move.l a4,8(a0)\n"
 "  move.l d0,12(a0)\n"
-"  movem.l (sp)+,d2-d6/a2-a5\n"
+"  movem.l (sp)+,d2/a2-a5\n"
 "  rts\n"
 "  .globl _movem16_in\n"
 "  _movem16_in:\n"
@@ -356,8 +391,11 @@ __asm(
 "  bmi.s 3f\n"
 "  tst.b (a2)\n"
 "  bmi.s 3f\n"
-"  tst.b (a5)\n"
-"  bmi.s 9f\n"
+"  move.b (a5),d1\n"
+"  bpl.s 4f\n"
+"  move.b d1,24(a0)\n"
+"  bra.s 9f\n"
+"  4:move.l 20(a0),d1\n"
 "  subq.l #1,d2\n"
 "  bne.s 2b\n"
 "  bra.s 9f\n"
@@ -374,7 +412,77 @@ __asm(
 "  move.l d0,12(a0)\n"
 "  movem.l (sp)+,d2-d6/a2-a5\n"
 "  rts\n"
+"  .globl _rom16_in\n"
+"  _rom16_in:\n"
+"  movem.l d2/a2-a5,-(sp)\n"
+"  movem.l (a0),a2-a4\n"
+"  movea.l 16(a0),a5\n"
+"  move.l 20(a0),d1\n"
+"  1:move.l d1,d2\n"
+"  2:tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  tst.b (a2)\n"
+"  bmi.s 3f\n"
+"  move.b (a5),d1\n"
+"  bpl.s 4f\n"
+"  move.b d1,24(a0)\n"
+"  bra.s 9f\n"
+"  4:move.l 20(a0),d1\n"
+"  subq.l #1,d2\n"
+"  bne.s 2b\n"
+"  bra.s 9f\n"
+"  3:move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  move.l (a3),(a4)+\n"
+"  tst.b (a2)\n"
+"  bmi.s 3b\n"
+"  bra.s 1b\n"
+"  9:move.l a4,8(a0)\n"
+"  movem.l (sp)+,d2/a2-a5\n"
+"  rts\n"
 );
+
+/* The Am53CF94 requires DMA NOP before loading the three-byte counter.
+   ENF is kept local to an experimental phase so ordinary 16-bit transfers
+   retain their original zero-means-64-KiB behavior. */
+static void load_count(struct MC *mc, ULONG n, int extended)
+{
+    if (extended) {
+        wr(mc, R_CFG2, CFG2_NORMAL | CFG2_ENF);
+        wr(mc, R_CMD, C_DMA | C_NOP);
+    }
+    wr(mc, R_TCLO, n);
+    wr(mc, R_TCMID, n >> 8);
+    if (extended)
+        wr(mc, R_TCHI, n >> 16);
+}
+
+static ULONG current_count(struct MC *mc, int extended)
+{
+    ULONG n = rd(mc, R_TCLO) | (ULONG)rd(mc, R_TCMID) << 8;
+    if (extended)
+        n |= (ULONG)rd(mc, R_TCHI) << 16;
+    return n;
+}
+
+static void end_extended_count(struct MC *mc, int extended)
+{
+    if (extended)
+        wr(mc, R_CFG2, CFG2_NORMAL);
+}
 
 #ifdef IRQXFER
 /* Interrupt-driven data phases. The task starts the chip's DMA and sleeps;
@@ -385,7 +493,7 @@ __asm(
    the polled transfers, done with interrupts off, don't allow. */
 
 /* Moves what the board offers now; returns the bytes moved. */
-static ULONG irq_move(struct MC *mc)
+static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
 {
     struct Xfer *x = &mc->x;
     volatile UBYTE *f16 = mc->board + MC_DREQ16, *fw = mc->board + MC_DREQW;
@@ -400,10 +508,13 @@ static ULONG irq_move(struct MC *mc)
         f.bursts = x->left >> 4;
         f.stat = &REG(mc, R_STAT);
         f.limit = MC_IRQ_ROUNDS;        /* rounds of 8 flag tests before leaving */
+        f.status = 0;
         if (x->in)
-            fast16_in(&f);
+            fast16_in_ready(&f);
         else
-            fast16_out(&f);
+            fast16_out_ready(&f);
+        if (f.status & ST_INT)
+            *sampled_status = f.status;
         x->st.bursts += (x->left >> 4) - f.bursts;
         x->left -= (UBYTE *)f.buf - x->p;
         x->p = (UBYTE *)f.buf;
@@ -441,11 +552,11 @@ static void irq_finish(struct MC *mc, UBYTE st)
         x->st.drained += drain(mc, 4096);
     mc->istat = st;
     mc->iseq = rd(mc, R_SEQ);
-    rest = rd(mc, R_TCLO) | (ULONG)rd(mc, R_TCMID) << 8;
+    rest = current_count(mc, x->extended);
     fifo = rd(mc, R_FFLAGS) & 0x1F;
     x->st.tcleft = rest;
     x->st.fflags = fifo;
-    if (!rest && x->n == 0x10000 && !(st & ST_TC))
+    if (!x->extended && !rest && x->n == 0x10000 && !(st & ST_TC))
         rest = x->n;
     x->moved = x->n - rest;
     if (x->in) {
@@ -476,9 +587,11 @@ static void irq_finish(struct MC *mc, UBYTE st)
 static LONG irq_xfer(struct MC *mc)
 {
     ULONG moved;
+    UBYTE st = 0;
     mc->x.st.irqs++;
-    moved = irq_move(mc);
-    UBYTE st = rd(mc, R_STAT);
+    moved = irq_move(mc, &st);
+    if (!(st & ST_INT))
+        st = rd(mc, R_STAT);
     if (st & ST_INT) {
         irq_finish(mc, st);
         return 1;
@@ -490,16 +603,19 @@ static LONG irq_xfer(struct MC *mc)
 static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
 {
     struct Xfer *x = &mc->x;
-    ULONG left = c->len - c->actual, n = left > 0x10000 ? 0x10000 : left;
+    ULONG left = c->len - c->actual;
+    int extended = c->mode == MCMODE_EXT24;
+    ULONG max = extended ? MAX_EXT_PHASE : 0x10000;
+    ULONG n = left > max ? max : left;
 
     memset(&x->st, 0, sizeof x->st);
     x->p = c->data + c->actual;
     x->left = n;
     x->n = n;
     x->in = c->in;
+    x->extended = extended;
     x->moved = 0;
-    wr(mc, R_TCLO, n);
-    wr(mc, R_TCMID, n >> 8);
+    load_count(mc, n, extended);
     mc->ipending = 0;
     x->st.chunks = 1;
     x->active = 1;
@@ -513,6 +629,7 @@ static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
         Enable();
         return HFERR_DMA;
     }
+    end_extended_count(mc, extended);
     mc->ipending = 1;                   /* esp_exec goes on from the latched registers */
     c->actual += x->moved;
     st->bursts += x->st.bursts;
@@ -548,11 +665,12 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     ULONG left = c->len - c->actual, n, spin = 0;
     UBYTE *p = c->data + c->actual, st_ = 0;
     UBYTE in = c->in;
+    int extended = c->mode == MCMODE_EXT24;
+    ULONG max = extended ? MAX_EXT_PHASE : 0x10000;
 
-    n = left > 0x10000 ? 0x10000 : left;
+    n = left > max ? max : left;
     left = n;
-    wr(mc, R_TCLO, n);
-    wr(mc, R_TCMID, n >> 8);            /* 0 for 64 KB */
+    load_count(mc, n, extended);
     st->chunks++;
     Disable();
     wr(mc, R_CMD, C_DMA | C_TI);
@@ -567,19 +685,25 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
         f.bursts = left >> sh;
         f.stat = &REG(mc, R_STAT);
         f.limit = SPIN_LIMIT / 8;      /* 8 flag tests per round */
+        f.status = 0;
         if (!in)
             fast16_out(&f);
         else if (c->mode == MCMODE_DMA32)
             fast32_in(&f);
         else if (c->mode == MCMODE_MOVEM)
             movem16_in(&f);
+        else if (c->mode == MCMODE_ROM16)
+            rom16_in(&f);
         else
             fast16_in(&f);
-        st->bursts += (left >> sh) - f.bursts;
+        st_ = f.status;
+        st->bursts += ((UBYTE *)f.buf - p) >> sh;
         left -= (UBYTE *)f.buf - p;
         p = (UBYTE *)f.buf;
     }
     for (;;) {
+        if (st_ & ST_INT)
+            break;
         if (left >= burst && (*dreqb & 0x80)) {
             ULONG *q = (ULONG *)p;
             if (in) {
@@ -656,14 +780,14 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     mc->iseq = rd(mc, R_SEQ);
     {
         /* What the chip moved on the bus: n minus the transfer counter. */
-        ULONG rest = rd(mc, R_TCLO) | (ULONG)rd(mc, R_TCMID) << 8;
+        ULONG rest = current_count(mc, extended);
         UBYTE fifo = rd(mc, R_FFLAGS) & 0x1F;
         ULONG moved;
         st->fflags = fifo;
         st->tcleft = rest;
         /* The counter is what counts; the TC bit is only checked for 64 KB,
            which loads as 0. (Emulators set the TC bit too early.) */
-        if (!rest && n == 0x10000 && !(st_ & ST_TC))
+        if (!extended && !rest && n == 0x10000 && !(st_ & ST_TC))
             rest = n;                   /* none of it moved */
         moved = n - rest;
         if (in) {
@@ -683,6 +807,7 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     st->stat = st_;
     st->intr = mc->iintr;
     st->seq = mc->iseq;
+    end_extended_count(mc, extended);
     mc->ipending = 1;
     Enable();
     return chip_error(st_);
@@ -747,7 +872,7 @@ static LONG data_phase(struct MC *mc, struct Cmd *c)
     if (c->mode == MCMODE_PIO)
         return pio_phase(mc, c, st);
 #ifdef IRQXFER
-    if (c->mode == MCMODE_DMA16)
+    if (c->mode == MCMODE_DMA16 || c->mode == MCMODE_EXT24)
         return irq_phase(mc, c, st);    /* the other modes stay polled, for MCDiag */
 #endif
     return dma_phase(mc, c, st);

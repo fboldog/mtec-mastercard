@@ -20,12 +20,14 @@ as a comparison.
 |---|---|---|
 | CF94 error handling | Gross and parity status bits were recorded but ignored. Parity reporting was disabled. This made sync or aggressive DMA experiments unsafe. | Implemented on this branch, with real-hardware validation pending: parity reporting and abort-on-parity are enabled; parity returns `HFERR_Parity`, gross error returns `HFERR_DMA`, and the bus is reset. |
 | Short interrupt poll | `FAST_POLLS=4000` represented about 1 ms at 50 MHz, but was machine-specific. | It is now `80 * MC_CPU_MHZ`, with a 42 MHz default (3360 polls) and build-time overrides. |
-| DMA transfer count | The CF94 has a 24-bit counter, but MCDevice uses only 16 bits and restarts the data phase every 64 KiB. | Next safe experiment. Enable the CF94 feature only in a separate IRQ test build and compare 64, 128, 256, 512 KiB and 1 MiB phases. |
+| DMA transfer count | The normal path uses 16 bits and restarts the data phase every 64 KiB. AMD documents a 24-bit counter behind `CFG2.ENF`, loaded after DMA NOP. | Implemented as private MCDiag mode `EXT24`, capped at 1 MiB and never selected automatically. It compares 128, 256, 512 KiB and 1 MiB phases with normal DMA16. Real-hardware validation pending. |
 | DMA16 | The `$C039` path is correct and fastest among the guaranteed board modes. | Production default. |
 | DMA32 | Skipping every second `$C039` check was about 8% faster in MCDiag, but the flag only guarantees 16 bytes. | Diagnostic experiment only; do not auto-select. |
+| Original-ROM loop | M-Tec omits MCDevice's software burst bound and trusts the CF94 counter. This removes `subq`/`beq` from each 16 bytes but a stuck DREQ could overwrite memory. | Implemented as read-only MCDiag mode `ROM16`; diagnostic only. Guard bytes and data are checked after timed reads. |
+| IRQ loop entry | IRQ code tested `$C039`, then the assembly loop tested it again and saved four unused data registers. The loop also discarded a status value that C reread. | Implemented: ready-entry variants consume the guaranteed 16 bytes immediately, DMA16 saves only the registers it uses, and sampled interrupt status is returned to C. Hardware validation pending. |
 | IRQ wait | Small commands normally finish inside the short poll and report zero timer sleeps, so they consume CPU while waiting. | Tune `MC_FAST_POLLS` for throughput versus task responsiveness. |
 | Bulk IRQ behavior | A 64 KiB read normally takes two server entries and zero timer sleeps. M-Tec's disassembled handler uses the same four-longword transfer and a similar run of DREQ tests. | `MC_FAST_POLLS` cannot materially accelerate the bulk inner loop. |
-| IRQ duration | Exec recommends deferring lengthy interrupt work, but the board appears to hold INT2 active while DREQ is asserted. Returning without moving the data would immediately retrigger the PORTS interrupt. | Keep the IRQ copy until a board-level DREQ interrupt mask or acknowledge mechanism is identified. A software interrupt alone does not solve this. |
+| IRQ duration | Exec recommends deferring lengthy interrupt work, but the board holds INT2 active while DREQ is asserted. Returning without moving the data would immediately retrigger the PORTS interrupt, and the byte-exact original-ROM disassembly uses no mask or acknowledge register. | Keep the IRQ copy. A software interrupt alone does not solve this; a card-local mask would require new hardware evidence. |
 | Disconnect/reselect | IDENTIFY forbids disconnect and the driver executes one request at a time. | Low priority for one solid-state target; potentially important with multiple targets or mechanical disks. |
 | Synchronous SCSI | MCDevice deliberately selects asynchronous operation. Previous sync tests used the old driver and do not prove MCDevice cannot support it, but they showed FIFO/gross-error risk and no speed gain. | Do not enable until error handling has passed on hardware. Then test offsets 4 and 8 with automatic async fallback. |
 | Write performance | Correctness and restore tests exist, but comparable write-throughput measurements do not. | Add restored-area write timing before tuning the output loop. |
@@ -39,7 +41,7 @@ experiments.
 |---|---:|---:|
 | `MC_FAST_POLLS` | 3360 | 512, 1024, 1680, 2520, 3360 |
 | `MC_IRQ_ROUNDS` | 4 | 1, 2, 4, 8 |
-| IRQ DMA phase | 64 KiB | 64, 128, 256, 512 KiB, 1 MiB after 24-bit-counter support |
+| IRQ DMA phase | 64 KiB | MCDiag `EXT24`: 128, 256, 512 KiB and 1 MiB |
 | Small-transfer mode | IRQ | IRQ or polled below 4, 8 and 16 KiB |
 | Board transfer | DMA16 | DMA16 |
 | SCSI transfer | asynchronous | asynchronous |
@@ -78,6 +80,20 @@ are outside the four-move kernel: reduce avoidable DREQ/status accesses and use
 the CF94's extended transfer counter to avoid restarting a long data phase every
 64 KiB. The latter must remain an opt-in IRQ-build experiment until it passes
 parity, gross-error, short-transfer and data-integrity tests on the card.
+
+The combined `dbpl` formulation was already measured in run 5, including a
+four-`move.l` comparison, and was 3-5% slower. The flag commonly drops while
+the FIFO refills, so its correction path matters more than the steady-state
+instruction timing suggests. `ROM16` instead measures the exact trade made by
+M-Tec: no software burst counter at all. It is not a candidate for the default
+until prolonged tests show a meaningful benefit and its reduced fault
+containment is accepted explicitly.
+
+`EXT24` is based on AMD's
+[Am53CF94/Am53CF96 datasheet](https://www.amd.com/content/dam/amd/en/documents/archived-tech-docs/datasheets/17348.pdf):
+set `CFG2.ENF`, issue DMA NOP, then load registers `$00`, `$01` and `$0E`.
+MCDevice clears ENF after the phase so the normal zero-count value continues to
+mean 64 KiB rather than the extended 16 MiB maximum.
 
 Motorola's MC68030 User's Manual adds the following constraints:
 
@@ -136,8 +152,8 @@ applied mechanically here. The board's data request itself appears to drive the
 shared level-2 PORTS interrupt and remains active until the CPU services the data
 port. A deferred routine would leave INT2 pending and prevent useful task
 execution unless the board or CF94 path provides a separate way to mask or
-acknowledge DREQ while preserving the transfer. No such register is currently
-known.
+acknowledge DREQ while preserving the transfer. The original ROM's interrupt
+handler contains no such access: it also copies until DREQ drops.
 
 ## Build-time tuning
 

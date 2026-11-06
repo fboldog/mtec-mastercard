@@ -18,7 +18,9 @@
 #define MCMODE_PIO    3     /* the chip's FIFO, no DMA: the reference */
 #define MCMODE_DMA32  4     /* experiment, reads: 32 bytes per $C039 */
 #define MCMODE_MOVEM  5     /* comparison, reads: DMA16 with two movem.l from $F000 */
-#define MCMODES       6
+#define MCMODE_ROM16  6     /* experiment: original ROM loop, trusts the chip transfer count */
+#define MCMODE_EXT24  7     /* experiment: 24-bit CF94 count, up to a 1 MiB DMA phase */
+#define MCMODES       8
 #define MCMODES_STD   4     /* the modes every test runs */
 
 struct MCStats {
