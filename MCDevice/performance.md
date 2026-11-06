@@ -404,6 +404,28 @@ from synchronous tests and instead sums the four per-command microsecond
 measurements made directly around `DoIO`, reporting their minimum and maximum
 as a variability check.
 
+The v8 logs are
+[`logs/mcdiag-22-sync-v8-sync.log`](logs/mcdiag-22-sync-v8-sync.log) and
+[`logs/mcdiag-22-sync-v8-read.log`](logs/mcdiag-22-sync-v8-read.log). Data again
+compared exactly at every size and the runs finished at 95/0/1 and 84/0/1; the
+ordinary devtest result was 5977/5592/4695 KiB/s. Direct command timings made
+the anomaly more specific. The 256 KiB 24-bit commands were stable at
+102284-103265 us, but the four 512 KiB commands ranged from 21320 to 113816 us.
+The fastest sample would require over 24 MiB/s and too few 42 MHz CPU cycles
+for 262144 iterations of the word mover.
+
+The register table in the
+[`NCR 53CF94/96-2 Data Manual`](../docs/53CF94_96-2_Fast_SCSI_Controller_Data_Manual_Apr1993.pdf)
+confirms that synchronous-period value 8 with a 40 MHz clock and FAST SCSI
+clear transfers one byte every eight clocks: exactly 5.0 MB/s. The 21 ms sample
+therefore cannot be a valid 512 KiB transfer. V8 poisoned and compared the
+destination only around the complete four-command group, so an early false
+completion could be hidden by a later correct read of the same LBA. V9 poisons
+and validates every repetition immediately, selects different regions within
+the captured 512 KiB reference where the transfer size permits, and prints all
+four command times. This separates stale/short-transfer acceptance from an
+EClock measurement fault.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

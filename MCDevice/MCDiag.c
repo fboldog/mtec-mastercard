@@ -289,10 +289,10 @@ static void hex16(char *d, const UBYTE *s)
     }
 }
 
-static void sync_diff_bytes(void)
+static void sync_diff_bytes(const UBYTE *want)
 {
     char r[48], g[48];
-    hex16(r, ref);
+    hex16(r, want);
     hex16(g, got);
     P("SYNC first16 ref  %s\n", (ULONG)r);
     P("SYNC first16 got  %s\n", (ULONG)g);
@@ -748,7 +748,7 @@ static void sync_tests(void)
     };
     UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     struct MCSyncReq sr;
-    ULONG k, i, j, m, nmodes, len, nb, bad, sumus, minus, maxus;
+    ULONG k, i, j, m, nmodes, len, nb, bad, sumus, off, us[4];
     LONG e;
 
     P("\n== SYNC diagnostic: read-only, ask 5 MB/s offset 4 ==\n");
@@ -805,7 +805,7 @@ static void sync_tests(void)
         P("SYNC WORD  512 B ERR %ld %lu/%lu s%02lx", e, dr.actual, len, (ULONG)dr.status);
     else if (bad) {
         P("SYNC WORD  512 B DIFF/OVER @%lx\n", bad - 1);
-        sync_diff_bytes();
+        sync_diff_bytes(ref);
     } else {
         oks++;
         P("SYNC WORD  512 B same");
@@ -826,24 +826,21 @@ static void sync_tests(void)
         for (m = 0; m < nmodes; m++) {
             UBYTE mode = m ? MCMODE_EXT24 : MCMODE_DMA16;
             const char *counter = m ? "24" : "16";
-            memset(got, 0x5A, len + 16);
             e = 0;
+            bad = 0;
             sumus = 0;
-            minus = ~0UL;
-            maxus = 0;
             for (j = 0; j < 4; j++) {
+                /* Use a different part of the captured reference whenever it
+                   fits, and poison the destination before every command. */
+                off = (j % (0x80000 / len)) * len;
+                put32(cdb + 2, off / bsize);
+                memset(got, 0x5A, len + 16);
                 e = run(mode, cdb, 10, 1, got, len);
-                sumus += lastus;
-                if (lastus < minus)
-                    minus = lastus;
-                if (lastus > maxus)
-                    maxus = lastus;
+                us[j] = lastus;
+                sumus += us[j];
                 if (e || dr.status || dr.actual != len)
                     break;
-            }
-            bad = 0;
-            if (!e && !dr.status && dr.actual == len) {
-                for (i = 0; i < len && got[i] == ref[i]; i++) ;
+                for (i = 0; i < len && got[i] == ref[off + i]; i++) ;
                 if (i != len)
                     bad = i + 1;
                 else for (i = len; i < len + 16; i++)
@@ -851,6 +848,8 @@ static void sync_tests(void)
                         bad = i + 1;
                         break;
                     }
+                if (bad)
+                    break;
             }
             if (e || dr.status || dr.actual != len)
                 P("SYNC%s %7lu B x4 ERR %ld %lu/%lu s%02lx", (ULONG)counter,
@@ -858,12 +857,13 @@ static void sync_tests(void)
             else if (bad) {
                 P("SYNC%s %7lu B x4 DIFF/OVER @%lx\n", (ULONG)counter,
                   len, bad - 1);
-                sync_diff_bytes();
+                sync_diff_bytes(ref + off);
             } else {
                 oks++;
-                P("SYNC%s %7lu B x4 same %lu KB/s, %lu..%lu us/cmd",
+                P("SYNC%s %7lu B x4 same %lu KB/s [%lu %lu %lu %lu] us",
                   (ULONG)counter, len,
-                  sumus ? (len >> 8) * 1000000UL / sumus : 0, minus, maxus);
+                  sumus ? (len >> 8) * 1000000UL / sumus : 0,
+                  us[0], us[1], us[2], us[3]);
             }
             stats();
             if (e || dr.status || dr.actual != len || bad)
