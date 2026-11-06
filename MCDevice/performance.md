@@ -520,6 +520,29 @@ fallback now performs the same number of flag reads as v12. The iterative ADF
 also uses `MCDiag TAKEOVER LOADONLY` at startup, installing the replacement
 driver without automatically running the full asynchronous baseline.
 
+The v14 logs are
+[`logs/mcdiag-28-sync-v14-sync.log`](logs/mcdiag-28-sync-v14-sync.log) and
+[`logs/mcdiag-28-sync-v14-write.log`](logs/mcdiag-28-sync-v14-write.log).
+Both directions remained byte-exact, the original block was restored, and the
+runs again finished at 95/0/1 and 96/0/1. Reusing the `$C039` sample removed
+the v13 slowdown: the four 512 KiB extended-counter reads reported 76.950,
+77.664, 73.221 and 73.225 ms. The independent 50 Hz intervals agreed that
+these commands spanned only three or four ticks. This apparent 6.8 MiB/s is
+above the negotiated 5 MB/s wire limit, so it is not a credible throughput
+claim even though every destination was poisoned and fully compared. It is
+additional evidence that timing this interrupt-driven path from the calling
+task is unreliable. Correctness and the exact mover counts are trustworthy:
+each phase used 32768 longword moves and 196608 word moves, with no FIFO or
+Transfer Pad bytes.
+
+The ordinary 16-bit counter split a 512 KiB command into eight phases and
+remained very slow at about 0.68 MiB/s. Any production synchronous path must
+therefore use the single-phase 24-bit counter. Before enabling that path, v15
+extends the restored write test from one block to 64 KiB and uses the 24-bit
+counter in both directions. It saves the complete region asynchronously,
+writes and verifies it synchronously, then resets the bus and restores and
+verifies all 64 KiB asynchronously.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

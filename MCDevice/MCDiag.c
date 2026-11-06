@@ -749,7 +749,7 @@ static void speed_tests(void)
 /* Opt-in sync test. It compares against an async 512 KiB read, starts with the
    conservative 5 MB/s / offset 4 agreement, and always resets the SCSI bus
    back to asynchronous operation before returning. With WRITE it also saves,
-   tests and asynchronously restores one medium block. */
+   tests and asynchronously restores a 64 KiB medium region. */
 static void sync_tests(int write, ULONG wlba)
 {
     /* Start small so a data-port/IRQ incompatibility is localized before the
@@ -762,48 +762,52 @@ static void sync_tests(int write, ULONG wlba)
     struct MCSyncReq sr;
     struct MCStats ws, rs;
     ULONG k, i, j, m, nmodes, len, nb, bad, sumus, off, w0, us[4], wall[4];
-    ULONG wact = 0, ract = 0, write_lba = 0, wus = 0, rus = 0;
+    ULONG wact = 0, ract = 0, write_lba = 0, write_len = 0, wus = 0, rus = 0;
     UBYTE wst = 0xFF, rst = 0xFF;
     int saved = 0, attempted = 0;
     LONG e;
 
     P("\n== SYNC diagnostic: ask 5 MB/s offset 4%s ==\n",
-      (ULONG)(write ? ", one-block write/restore" : ", read-only"));
+      (ULONG)(write ? ", 64 KiB write/restore" : ", read-only"));
     if (!efreq || !bsize || workbufsize < 0x80000 + 16) {
         P("SYNC               skipped: EClock, medium or large buffers unavailable\n");
         skips++;
         return;
     }
     if (write) {
-        if (blocks <= 300) {
+        write_len = 0x10000;
+        if (blocks <= 300 || write_len / bsize > blocks) {
             P("SYNC WRITE         skipped: medium is too small for the default scratch block\n");
             skips++;
             return;
         }
         write_lba = wlba ? wlba : blocks - 300;
-        if (write_lba >= blocks) {
-            P("SYNC WRITE         skipped: LBA %lu is outside the medium\n", write_lba);
+        nb = write_len / bsize;
+        if (write_lba > blocks - nb) {
+            P("SYNC WRITE         skipped: %lu blocks at LBA %lu exceed the medium\n",
+              nb, write_lba);
             skips++;
             return;
         }
         memset(rcdb, 0, sizeof rcdb);
         rcdb[0] = 0x28;
         put32(rcdb + 2, write_lba);
-        rcdb[8] = 1;
+        rcdb[7] = nb >> 8;
+        rcdb[8] = nb;
         for (i = 0; i < sizeof wcdb; i++)
             wcdb[i] = rcdb[i];
         wcdb[0] = 0x2A;
-        e = run(MCMODE_DMA16, rcdb, 10, 1, save, bsize);
-        if (e || dr.status || dr.actual != bsize) {
+        e = run(MCMODE_DMA16, rcdb, 10, 1, save, write_len);
+        if (e || dr.status || dr.actual != write_len) {
             P("SYNC WRITE         skipped: cannot save LBA %lu, e%ld %lu/%lu s%02lx",
-              write_lba, e, dr.actual, bsize, (ULONG)dr.status);
+              write_lba, e, dr.actual, write_len, (ULONG)dr.status);
             stats();
             skips++;
             return;
         }
         saved = 1;
         P("SYNC WRITE         saved original LBA %lu (%lu bytes) asynchronously\n",
-          write_lba, bsize);
+          write_lba, write_len);
     }
     len = 0x80000;
     nb = len / bsize;
@@ -929,29 +933,29 @@ static void sync_tests(int write, ULONG wlba)
     if (write && saved) {
         LONG re = 0;
         attempted = 1;
-        pattern(got, bsize, 0x53);
-        e = run(MCMODE_DMA16, wcdb, 10, 0, got, bsize);
+        pattern(got, write_len, 0x53);
+        e = run(MCMODE_EXT24, wcdb, 10, 0, got, write_len);
         wus = lastus;
         wact = dr.actual;
         wst = dr.status;
         ws = dr.st;
         memset(&rs, 0, sizeof rs);
-        memset(ref, 0x5A, bsize + 16);
+        memset(ref, 0x5A, write_len + 16);
         if (!e && !wst) {
-            re = run(MCMODE_DMA16, rcdb, 10, 1, ref, bsize);
+            re = run(MCMODE_EXT24, rcdb, 10, 1, ref, write_len);
             rus = lastus;
             ract = dr.actual;
             rst = dr.status;
             rs = dr.st;
         }
-        for (i = 0; i < bsize && ref[i] == got[i]; i++) ;
-        if (!e && !re && !wst && !rst && wact == bsize && ract == bsize &&
-            i == bsize && ref[bsize] == 0x5A) {
+        for (i = 0; i < write_len && ref[i] == got[i]; i++) ;
+        if (!e && !re && !wst && !rst && wact == write_len && ract == write_len &&
+            i == write_len && ref[write_len] == 0x5A) {
             oks++;
-            P("SYNC WRITE 1 blk  same at LBA %lu\n", write_lba);
+            P("SYNC WRITE 64K    same at LBA %lu\n", write_lba);
         } else {
             fails++;
-            P("SYNC WRITE 1 blk  FAIL e%ld/%ld w%lu/s%02lx r%lu/s%02lx @%lx\n",
+            P("SYNC WRITE 64K    FAIL e%ld/%ld w%lu/s%02lx r%lu/s%02lx @%lx\n",
               e, re, wact, (ULONG)wst, ract, (ULONG)rst, i);
         }
         P("  write:");
@@ -970,15 +974,15 @@ restore_sync:
         LONG re;
         ULONG restore_wact;
         UBYTE restore_wst;
-        e = run(MCMODE_DMA16, wcdb, 10, 0, save, bsize);
+        e = run(MCMODE_DMA16, wcdb, 10, 0, save, write_len);
         restore_wact = dr.actual;
         restore_wst = dr.status;
-        memset(got, 0x5A, bsize + 16);
+        memset(got, 0x5A, write_len + 16);
         re = e || restore_wst ? (e ? e : HFERR_BadStatus) :
-             run(MCMODE_DMA16, rcdb, 10, 1, got, bsize);
-        for (i = 0; i < bsize && got[i] == save[i]; i++) ;
-        if (e || restore_wst || restore_wact != bsize || re || dr.status ||
-            dr.actual != bsize || i != bsize) {
+             run(MCMODE_DMA16, rcdb, 10, 1, got, write_len);
+        for (i = 0; i < write_len && got[i] == save[i]; i++) ;
+        if (e || restore_wst || restore_wact != write_len || re || dr.status ||
+            dr.actual != write_len || i != write_len) {
             fails++;
             P("SYNC WRITE RESTORE FAILED at LBA %lu, original data may be lost\n",
               write_lba);
