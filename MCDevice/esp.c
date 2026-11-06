@@ -1,11 +1,12 @@
 /* esp.c - the NCR 53CF94 on the MasterCard, as a SCSI initiator.
  *
- * One command at a time, no disconnection, asynchronous transfers. The chip's
- * interrupts are caught by mc_irq on INT2, which latches the status, sequence
- * step and interrupt registers and signals the driver task. Data phases go
- * through the board's data port with the chip in DMA mode: the CPU moves 16
- * bytes each time the board says it can, then words at the end. Like the
- * original driver, this runs with interrupts disabled, so the board's data
+ * One command at a time, no disconnection. Production commands are
+ * asynchronous; the diagnostic interface can opt into synchronous transfers.
+ * The chip's interrupts are caught by mc_irq on INT2, which latches the status,
+ * sequence step and interrupt registers and signals the driver task. Data
+ * phases go through the board's data port with the chip in DMA mode: the CPU
+ * moves 16 bytes each time the board says it can, then words at the end. Like
+ * the original driver, this runs with interrupts disabled, so the board's data
  * request can't hold INT2 while the task is not looking.
  */
 #include <exec/execbase.h>
@@ -498,11 +499,13 @@ static ULONG current_count(struct MC *mc, int extended)
    above INT2 (audio, vertical blank, serial) keep running throughout, which
    the polled transfers, done with interrupts off, don't allow. */
 
-/* Moves what the board offers now; returns the bytes moved.  Do not reserve
-   the word path for the tail of a transfer: a synchronous target can have
+/* Moves what the board offers now; returns the bytes moved.  Synchronous
+   transfers must use only the word-ready handshake.  Hardware tests show that
+   $C039 can assert once at phase entry with offset four, but consuming that
+   16-byte window corrupts the stream.  A synchronous target can also have
    fewer than 16 REQs outstanding, so $D039 may be ready while $C039 can never
-   become ready.  Leaving that word on the board holds INT2 asserted and
-   traps the machine in the level-2 interrupt chain. */
+   become ready.  Leaving that word on the board holds INT2 asserted and traps
+   the machine in the level-2 interrupt chain. */
 static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
 {
     struct Xfer *x = &mc->x;
@@ -510,7 +513,7 @@ static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
     volatile UWORD *pw = (volatile UWORD *)(mc->board + MC_PORT);
     ULONG start = x->left;
 
-    if (x->left >= 16 && (*f16 & 0x80)) {
+    if (!x->sync && x->left >= 16 && (*f16 & 0x80)) {
         struct Fast f;
         f.flag = f16;
         f.port = (volatile ULONG *)(mc->board + MC_PORT);

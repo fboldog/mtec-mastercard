@@ -335,6 +335,30 @@ pending sense data once and cleared it, so the three following calls correctly
 returned different bytes. MCDiag now runs this state-consuming command only
 once instead of treating repeated payloads as a transfer-mode comparison.
 
+The v5 logs are
+[`logs/mcdiag-19-sync-v5-sync.log`](logs/mcdiag-19-sync-v5-sync.log) and
+[`logs/mcdiag-19-sync-v5-read.log`](logs/mcdiag-19-sync-v5-read.log). The
+ordinary path again passed at 84/0/1 and devtest measured 5973/5604/4633 KiB/s.
+The isolated synchronous WORD read was byte-exact: 512 bytes moved as 256 word
+handshakes in 2815 us, with no burst and no Transfer Pad (`b0 w256 q0`). This
+proves that SDTR, the CF94 synchronous period/offset programming, and the
+board's word-ready DACK path all work together.
+
+The following interrupt-driven DMA16 attempt entered the 16-byte routine once,
+then moved 248 words, exhausted its programmed count in Data-In, and required
+Transfer Pad before returning `HFERR_DMA` (`b1 w248 q1 tcFFF8`). Together with
+v4's first mismatch at the negotiated offset, this isolates the fault to the
+board's 16-byte-ready/burst semantics during synchronous transfers. The IRQ
+mover now suppresses that path whenever the command has a non-zero synchronous
+offset and services the complete phase using `$D039` word-ready interrupts.
+Asynchronous commands retain their existing fast 16-byte path.
+
+The conservative path is intended to establish a correct interrupt-driven
+synchronous baseline, not yet a speed improvement. Based on the asynchronous
+WORD result, long transfers are likely to remain around 0.6 MiB/s until a safe
+multi-word synchronous handshake is found. Production commands also remain
+asynchronous; synchronization is still enabled only by the diagnostic command.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately
