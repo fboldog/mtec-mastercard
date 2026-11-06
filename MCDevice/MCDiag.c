@@ -2,6 +2,7 @@
  *
  *   MCDiag [UNIT n] [TAKEOVER] [WRITE] [LBA n] [LOG file] [FINDUNIT]
  *          [NODMA8] [NOPIO] [SYNC] [FAST] [LOADONLY]
+ *          [ENABLESYNC] [DISABLESYNC]
  *
  * Every test runs a SCSI command through the chip's FIFO without DMA first
  * (PIO, the reference), then with each of the board's data port modes, and
@@ -276,6 +277,35 @@ static LONG sync_control(UBYTE period, UBYTE offset, struct MCSyncReq *r)
     if (DoIO((struct IORequest *)&io))
         return io.io_Error;
     return r->err;
+}
+
+/* Leave conservative synchronization active so ordinary device commands can
+   exercise the production path, or reset the whole bus back to async. */
+static void driver_sync(int enable)
+{
+    struct MCSyncReq r;
+    LONG e = sync_control(enable ? 50 : 0, enable ? 4 : 0, &r);
+
+    if (!enable) {
+        if (e) {
+            fails++;
+            P("DRIVER SYNC OFF   FAILED %ld\n", e);
+        } else {
+            oks++;
+            P("DRIVER SYNC OFF   asynchronous restore ok (SCSI bus reset)\n");
+        }
+        return;
+    }
+    if (e || !r.offset) {
+        fails++;
+        P("DRIVER SYNC ON    FAILED %ld step %lu reply factor %lu offset %lu\n",
+          e, (ULONG)r.step, (ULONG)r.period, (ULONG)r.offset);
+    } else {
+        oks++;
+        P("DRIVER SYNC ON    factor %lu offset %lu, CF94 period %lu (~%lu KB/s bus)\n",
+          (ULONG)r.period, (ULONG)r.offset, (ULONG)r.chip_period,
+          r.period ? 250000UL / r.period : 0);
+    }
 }
 
 static void stats(void)
@@ -1174,7 +1204,7 @@ static void unit_tests(ULONG unit, int write, ULONG wlba, int sync, int fast)
 LONG start(void)
 {
     LONG rc = RETURN_FAIL;
-    LONG args[11] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    LONG args[13] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     struct RDArgs *ra;
     ULONG unit, first, last;
 
@@ -1182,7 +1212,7 @@ LONG start(void)
     DOSBase = (struct DosLibrary *)OpenLibrary((STRPTR)"dos.library", 37);
     if (!DOSBase)
         return rc;
-    ra = (struct RDArgs *)ReadArgs((STRPTR)"UNIT/N,TAKEOVER/S,WRITE/S,LBA/N,LOG/K,FINDUNIT/S,NODMA8/S,NOPIO/S,SYNC/S,FAST/S,LOADONLY/S", args, 0);
+    ra = (struct RDArgs *)ReadArgs((STRPTR)"UNIT/N,TAKEOVER/S,WRITE/S,LBA/N,LOG/K,FINDUNIT/S,NODMA8/S,NOPIO/S,SYNC/S,FAST/S,LOADONLY/S,ENABLESYNC/S,DISABLESYNC/S", args, 0);
     if (!ra) {
         PrintFault(IoErr(), (STRPTR)"MCDiag");
         goto done;
@@ -1263,8 +1293,11 @@ LONG start(void)
                     P("Unit %lu: open failed, error %ld\n", unit, (LONG)io.io_Error);
             continue;
         }
-        unit_tests(unit, args[2] != 0, args[3] ? *(ULONG *)args[3] : 0,
-                   args[8] != 0, args[9] != 0);
+        if (args[11] || args[12])
+            driver_sync(args[11] != 0);
+        else
+            unit_tests(unit, args[2] != 0, args[3] ? *(ULONG *)args[3] : 0,
+                       args[8] != 0, args[9] != 0);
         CloseDevice((struct IORequest *)&io);
     }
     P("\nRESULT %lu ok, %lu failed, %lu skipped\n", oks, fails, skips);

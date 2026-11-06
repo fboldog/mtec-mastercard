@@ -1,8 +1,8 @@
-; Opt-in synchronous Data-Out test. One block near the end of the disk is
-; saved asynchronously, written/read synchronously, then restored and verified
-; asynchronously. For another place, add: LBA n
+; Opt-in synchronous Data-Out test. A 512 KiB region near the end of the disk
+; is saved asynchronously, written/read synchronously, then restored and
+; verified asynchronously. For another place, add: LBA n
 FailAt 21
-Echo "Experimental sync WRITE test: one saved/restored medium block."
+Echo "Experimental sync WRITE test: one saved/restored 512 KiB region."
 Set u `MCDiag FINDUNIT`
 MCDiag UNIT $u SYNC WRITE LOG DF0:mcsync-write.log
 Echo "Done. Check DF0:mcsync-write.log for the restore result."

@@ -1,5 +1,5 @@
 ; Quick iterative sync-test boot: replace the original driver but do not run
-; the full asynchronous baseline. Run S:sync-test, then S:sync-write-test.
+; the full asynchronous baseline. Run one of the tests in S: explicitly.
 FailAt 21
 MakeDir RAM:T
 Assign T: RAM:T
@@ -7,3 +7,4 @@ Echo "Loading mastercard.device without the full baseline test."
 Echo "Don't use the hard disk until you reboot."
 MCDiag TAKEOVER LOADONLY
 Echo "Ready: Execute S:sync-test"
+Echo "Production-path test: Execute S:sync-driver-test"

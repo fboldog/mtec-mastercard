@@ -555,6 +555,24 @@ readback reported 34.801 ms. V16 therefore expands the same failure-safe test
 to one complete 512 KiB extended-counter phase before production negotiation
 is considered.
 
+The v16 result is
+[`logs/mcdiag-30-sync-v16-write.log`](logs/mcdiag-30-sync-v16-write.log).
+The full 512 KiB synchronous Data-Out and readback were byte-exact, each used
+one extended-counter phase with `l32768 w196608`, and the complete original
+region at LBA 15710932 was restored and verified asynchronously. The run again
+finished at 96/0/1. Data-Out took 98.675 ms (about 5.1 MiB/s), while the paired
+Data-In took 168.904 ms (about 3.0 MiB/s). Together with the earlier samples,
+this proves large synchronous writes are correct but confirms that measured
+sync speed varies substantially between otherwise identical commands.
+
+V17 therefore does not enable sync automatically. It adds an explicit
+diagnostic control that leaves factor-50/offset-4 negotiation active for the
+unit, runs ordinary `CMD_READ` traffic through the driver's normal API, and
+then resets the bus to asynchronous mode. Normal synchronous data phases use
+the proven 24-bit counter from 64 KiB upward; smaller phases retain the proven
+16-bit counter. This isolates the production-path experiment from boot and
+unrelated targets.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

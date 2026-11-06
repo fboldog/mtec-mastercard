@@ -121,7 +121,8 @@ static LONG scsi(struct MC *mc, struct MCUnit *u, UBYTE *cdb, UWORD cdblen, void
         c.in = in;
         c.data = data;
         c.len = len;
-        if (in && len >= MC_EXT_READ_MIN)
+        if ((u->sync_offset && len >= MC_SYNC_EXT_MIN) ||
+            (in && len >= MC_EXT_READ_MIN))
             c.mode = MCMODE_EXT24;
         c.sync_period = u->sync_period;
         c.sync_offset = u->sync_offset;
@@ -293,7 +294,8 @@ static void scsicmd(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     c.in = sc->scsi_Flags & SCSIF_READ;
     c.data = (UBYTE *)sc->scsi_Data;
     c.len = sc->scsi_Length;
-    c.mode = c.in && c.len >= MC_EXT_READ_MIN ? MCMODE_EXT24 : MCMODE_DMA16;
+    c.mode = ((u->sync_offset && c.len >= MC_SYNC_EXT_MIN) ||
+              (c.in && c.len >= MC_EXT_READ_MIN)) ? MCMODE_EXT24 : MCMODE_DMA16;
     c.sync_period = u->sync_period;
     c.sync_offset = u->sync_offset;
     sc->scsi_Actual = 0;

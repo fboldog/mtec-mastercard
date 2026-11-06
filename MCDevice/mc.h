@@ -41,6 +41,13 @@ static inline void NewList(struct List *l)
 #define MC_EXT_READ_MIN 0x00080000UL    /* 512 KiB */
 #endif
 
+/* Synchronous 16-bit-count phases are correct but become extremely slow when
+   split at 64 KiB. Hardware tests validated the extended counter in both
+   directions at 64 KiB and 512 KiB. */
+#ifndef MC_SYNC_EXT_MIN
+#define MC_SYNC_EXT_MIN 0x00010000UL    /* 64 KiB */
+#endif
+
 #define MC_REGS     0xC000
 #define MC_DREQ16   0xC039
 #define MC_DREQ8    0xC839
