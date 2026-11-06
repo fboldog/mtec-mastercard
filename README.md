@@ -396,6 +396,7 @@ Read speed over the runs, all on the same BlueSCSI Pico:
 | 3 | poll for the chip interrupt before sleeping | 5478 / 5268 / 4444 KB/s |
 | 5 | `movem.l` and a `dbpl` loop end: slower, reverted | 5144 / 4943 / 4220 KB/s |
 | 7 | test the flag 8 times before the chip status | 5918 / 5666 / 4699 KB/s |
+| 14 | IRQ loop cleanup, fixed 16-byte CDBs, extended count for 512 KiB reads | 5976 / 5613 / 4619 KB/s |
 | - | M-Tec's own driver | 6024 / 5796 / 4964 KB/s |
 
 What the real board showed:

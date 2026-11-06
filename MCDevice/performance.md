@@ -183,6 +183,26 @@ reads of at least 512 KiB use one or more extended phases of at most 512 KiB;
 shorter reads and all writes keep the bounded 16-bit-count path. The diagnostic
 DMA16 mode remains an unmodified baseline for future comparisons.
 
+### Production-threshold validation
+
+The fifth capture is in
+[`logs/mcdiag-14-perf-auto-ext512.log`](logs/mcdiag-14-perf-auto-ext512.log).
+With automatic extended counting enabled for large reads, MCDiag again completed
+with 87 passes, no failures and one unsupported skip. Both READ CAPACITY(16)
+checks passed. The normal devtest results changed as intended:
+
+| Transfer | Before automatic EXT24 | Automatic EXT24 | Difference |
+|---:|---:|---:|---:|
+| 512 KiB | 5881 KiB/s | 5976 KiB/s | +1.6% |
+| 128 KiB | 5614 KiB/s | 5613 KiB/s | unchanged |
+| 32 KiB | 4608 KiB/s | 4619 KiB/s | unchanged/noise |
+
+The paired diagnostic 512 KiB measurement was 5702 KiB/s for DMA16 and
+5809 KiB/s for EXT24 (+1.9%). This confirms the production threshold is active
+only where intended. At 512 KiB the IRQ driver is now within 0.8% of the
+previously measured 6024 KiB/s M-Tec result while retaining vertical-blank and
+higher-priority interrupt service.
+
 The two fair IRQ ROM16 runs differed from bounded DMA16 by 0.08% and 1.7%.
 That small, unstable gain does not justify removing the software buffer bound.
 The safe ready-entry changes remain: they avoid one known-ready DREQ read, save
