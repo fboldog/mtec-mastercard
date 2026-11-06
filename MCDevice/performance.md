@@ -20,10 +20,10 @@ as a comparison.
 |---|---|---|
 | CF94 error handling | Gross and parity status bits were recorded but ignored. Parity reporting was disabled. This made sync or aggressive DMA experiments unsafe. | Implemented on this branch, with real-hardware validation pending: parity reporting and abort-on-parity are enabled; parity returns `HFERR_Parity`, gross error returns `HFERR_DMA`, and the bus is reset. |
 | Short interrupt poll | `FAST_POLLS=4000` represented about 1 ms at 50 MHz, but was machine-specific. | It is now `80 * MC_CPU_MHZ`, with a 42 MHz default (3360 polls) and build-time overrides. |
-| DMA transfer count | The normal path uses 16 bits and restarts the data phase every 64 KiB. AMD documents a 24-bit counter behind `CFG2.ENF`, loaded after DMA NOP. | Implemented as private MCDiag mode `EXT24`, capped at 512 KiB and never selected automatically. The first hardware run passed at 128, 256 and 512 KiB; a 1 MiB phase corrupted timing state and was rejected. |
+| DMA transfer count | The normal path uses 16 bits and restarts the data phase every 64 KiB. AMD documents a 24-bit counter behind `CFG2.ENF`, loaded after DMA NOP. | Private MCDiag mode `EXT24`, capped at 512 KiB. The matched-size run measured +1.8%, -0.2% and +3.5% at 128, 256 and 512 KiB, but the following 16-byte CDB failed. It remains diagnostic and is not selected automatically. |
 | DMA16 | The `$C039` path is correct and fastest among the guaranteed board modes. | Production default. |
 | DMA32 | Skipping every second `$C039` check was about 8% faster in MCDiag, but the flag only guarantees 16 bytes. | Diagnostic experiment only; do not auto-select. |
-| Original-ROM loop | M-Tec omits MCDevice's software burst bound and trusts the CF94 counter. This removes `subq`/`beq` from each 16 bytes but a stuck DREQ could overwrite memory. | Implemented as read-only MCDiag mode `ROM16`; diagnostic only. Guard bytes and data are checked after timed reads. It now uses the same IRQ path as DMA16 so their timings are comparable. |
+| Original-ROM loop | M-Tec omits MCDevice's software burst bound and trusts the CF94 counter. This removes `subq`/`beq` from each 16 bytes but a stuck DREQ could overwrite memory. | Rejected for production. In the fair IRQ comparison it measured 3844 KiB/s against DMA16's 3841 KiB/s: no useful gain for losing the software bound. |
 | IRQ loop entry | IRQ code tested `$C039`, then the assembly loop tested it again and saved four unused data registers. The loop also discarded a status value that C reread. | Implemented: ready-entry variants consume the guaranteed 16 bytes immediately, DMA16 saves only the registers it uses, and sampled interrupt status is returned to C. The first hardware run passed all normal integrity tests. |
 | IRQ wait | Small commands normally finish inside the short poll and report zero timer sleeps, so they consume CPU while waiting. | Tune `MC_FAST_POLLS` for throughput versus task responsiveness. |
 | Bulk IRQ behavior | A 64 KiB read normally takes two server entries and zero timer sleeps. M-Tec's disassembled handler uses the same four-longword transfer and a similar run of DREQ tests. | `MC_FAST_POLLS` cannot materially accelerate the bulk inner loop. |
@@ -111,9 +111,35 @@ complete console capture is in
 | EXT24, 128/256/512 KiB | 5488/5685/5679 KiB/s | All three data checks passed, but this build did not time matching DMA16 command sizes. The corrected sweep reports both modes at each size. |
 | EXT24, 1 MiB | invalid | The impossible 12393 KiB/s result and corrupted VBlank duration show memory/state corruption even though the immediate data comparison passed. Single phases are therefore capped at 512 KiB. |
 
-The following `READ_CAPACITY_16` returned `HFERR_DMA`, which is another reason
-not to retain the 1 MiB experiment. Requests larger than 512 KiB remain valid:
-the driver divides them into multiple extended-count phases.
+The following `READ_CAPACITY_16` returned `HFERR_DMA`. The corrected second run
+removed the 1 MiB phase but reproduced that failure, so it was not caused only
+by the oversized phase. Requests larger than 512 KiB remain valid in normal
+DMA16 mode because the driver divides them into 64 KiB phases.
+
+### Corrected matched-size run
+
+The second capture is in
+[`logs/mcdiag-11-perf-corrected.log`](logs/mcdiag-11-perf-corrected.log). It
+completed with 86 passes, no failures and one unsupported buffer-command skip.
+
+| Size | DMA16 | EXT24 | EXT24 difference |
+|---:|---:|---:|---:|
+| 128 KiB | 5392 KiB/s | 5491 KiB/s | +1.8% |
+| 256 KiB | 5600 KiB/s | 5588 KiB/s | -0.2% |
+| 512 KiB | 5606 KiB/s | 5804 KiB/s | +3.5% |
+
+The ordinary devtest 512 KiB path reached 5877 KiB/s in the same run, so EXT24
+has not established a throughput advantage. More importantly, the following
+`READ_CAPACITY_16` again returned `HFERR_DMA`. ENF changes status-phase latching
+as well as enabling the high counter byte. The experiment had cleared ENF as
+soon as its data phase ended, part-way through the SCSI command. The next build
+keeps ENF stable until status and command-complete have finished and adds a
+post-EXT READ CAPACITY(16) check.
+
+The fair IRQ ROM16 result was 3844 KiB/s against 3841 KiB/s for bounded DMA16,
+a difference of 0.08%. ROM16 is therefore not a useful optimization. The safe
+ready-entry changes remain: they avoid one known-ready DREQ read, save only the
+registers used by the loop, and return the already-sampled chip status.
 
 Motorola's MC68030 User's Manual adds the following constraints:
 

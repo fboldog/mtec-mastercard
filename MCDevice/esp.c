@@ -464,14 +464,12 @@ __asm(
 );
 
 /* The Am53CF94 requires DMA NOP before loading the three-byte counter.
-   ENF is kept local to an experimental phase so ordinary 16-bit transfers
-   retain their original zero-means-64-KiB behavior. */
+   esp_exec keeps ENF set for the complete experimental command so ordinary
+   commands retain their original zero-means-64-KiB behavior. */
 static void load_count(struct MC *mc, ULONG n, int extended)
 {
-    if (extended) {
-        wr(mc, R_CFG2, CFG2_NORMAL | CFG2_ENF);
+    if (extended)
         wr(mc, R_CMD, C_DMA | C_NOP);
-    }
     wr(mc, R_TCLO, n);
     wr(mc, R_TCMID, n >> 8);
     if (extended)
@@ -484,12 +482,6 @@ static ULONG current_count(struct MC *mc, int extended)
     if (extended)
         n |= (ULONG)rd(mc, R_TCHI) << 16;
     return n;
-}
-
-static void end_extended_count(struct MC *mc, int extended)
-{
-    if (extended)
-        wr(mc, R_CFG2, CFG2_NORMAL);
 }
 
 #ifdef IRQXFER
@@ -641,7 +633,6 @@ static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
         Enable();
         return HFERR_DMA;
     }
-    end_extended_count(mc, extended);
     mc->ipending = 1;                   /* esp_exec goes on from the latched registers */
     c->actual += x->moved;
     st->bursts += x->st.bursts;
@@ -819,7 +810,6 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     st->stat = st_;
     st->intr = mc->iintr;
     st->seq = mc->iseq;
-    end_extended_count(mc, extended);
     mc->ipending = 1;
     Enable();
     return chip_error(st_);
@@ -894,11 +884,17 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
 {
     UWORD k;
     int phases = 0;
+    int extended = c->mode == MCMODE_EXT24;
     LONG err = 0;
 
     c->actual = 0;
     c->status = 0xFF;
     mc->ipending = 0;
+    /* ENF also changes status-phase latching.  Keep it stable for the whole
+       SCSI command; changing CFG2 between data and status poisoned the next
+       command on the real CF94 even though the data itself was correct. */
+    if (extended)
+        wr(mc, R_CFG2, CFG2_NORMAL | CFG2_ENF);
     wr(mc, R_CMD, C_FLUSH);
     wr(mc, R_DESTID, target);
     wr(mc, R_SYNCPER, 0);
@@ -913,6 +909,8 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
     }
     if (mc->iintr & IN_DISC) {
         wr(mc, R_CMD, C_FLUSH);
+        if (extended)
+            wr(mc, R_CFG2, CFG2_NORMAL);
         return HFERR_SelTimeout;        /* nobody answered */
     }
     for (;;) {
@@ -921,8 +919,11 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
             esp_busreset(mc);
             return err;
         }
-        if (intr & IN_DISC)
+        if (intr & IN_DISC) {
+            if (extended)
+                wr(mc, R_CFG2, CFG2_NORMAL);
             return err ? err : HFERR_Phase; /* gone before the status phase */
+        }
         if (intr & (IN_ILLEGAL | IN_RESET) || ++phases > MAX_PHASES) {
             esp_init(mc);
             return HFERR_Phase;
@@ -954,6 +955,8 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
                 goto stuck;
             if ((err = chip_error(mc->istat)))
                 goto chip_failed;
+            if (extended)
+                wr(mc, R_CFG2, CFG2_NORMAL);
             return 0;
         case PH_MSGIN:
             wr(mc, R_CMD, C_TI);

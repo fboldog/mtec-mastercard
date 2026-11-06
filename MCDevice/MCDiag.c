@@ -681,6 +681,24 @@ static void speed_tests(void)
             stats();
         }
     }
+    {
+        /* ENF changes more than the counter width.  Verify that an EXT24
+           command did not poison the following normal command, as happened
+           in the first two experiment builds. */
+        static const UBYTE rcap16[16] = {
+            0x9E, 0x10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0
+        };
+        LONG e;
+        memset(got, 0x5A, 48);
+        e = run(MCMODE_DMA16, rcap16, 16, 1, got, 32);
+        if (e || dr.status || dr.actual != 32)
+            P("POST-EXT RCAP16    ERR %ld %lu/32 s%02lx", e, dr.actual, (ULONG)dr.status);
+        else {
+            oks++;
+            P("POST-EXT RCAP16    ok  32/32 s%02lx", (ULONG)dr.status);
+        }
+        stats();
+    }
 }
 
 static int open_unit(ULONG unit)
