@@ -354,11 +354,12 @@ offset. It still accepts either `$C039` or `$D039` before moving one word, as
 the existing tail path did; it does not consume 16 bytes from one `$C039`
 sample. Asynchronous commands retain their existing fast 16-byte path.
 
-The conservative path is intended to establish a correct interrupt-driven
-synchronous baseline, not yet a speed improvement. Based on the asynchronous
-WORD result, long transfers are likely to remain around 0.6 MiB/s until a safe
-multi-word synchronous handshake is found. Production commands also remain
-asynchronous; synchronization is still enabled only by the diagnostic command.
+The conservative path was intended to establish a correct interrupt-driven
+synchronous baseline rather than assume a speed improvement. The later ENF
+tests show that word-at-a-time transfers can nevertheless become fast when the
+controller uses one uninterrupted 24-bit-count phase. Production commands
+remain asynchronous; synchronization is still enabled only by the diagnostic
+command.
 
 The v6 logs are
 [`logs/mcdiag-20-sync-v6-sync.log`](logs/mcdiag-20-sync-v6-sync.log) and
@@ -377,6 +378,31 @@ v7 diagnostic therefore runs matched 16-bit and 24-bit-count transfers at 64,
 128, 256 and 512 KiB. It also fixes the sub-KiB throughput calculation; the
 very large v6 VBlank-gap values are instrumentation anomalies and not used as
 transfer timings.
+
+The v7 logs are
+[`logs/mcdiag-21-sync-v7-sync.log`](logs/mcdiag-21-sync-v7-sync.log) and
+[`logs/mcdiag-21-sync-v7-read.log`](logs/mcdiag-21-sync-v7-read.log). All
+matched reads were byte-exact, used no bursts or Transfer Pad (`b0 q0`), and
+the sync run finished at 95/0/1. The ordinary baseline also remained clean at
+84/0/1 and 5978/5600/4591 KiB/s. At 64 KiB the reported SYNC16 and SYNC24 rates
+were effectively equal, while the single 24-bit-count phase pulled ahead as
+the transfer grew:
+
+| Size | 16-bit chunks | 24-bit phase |
+|---:|---:|---:|
+| 64 KiB | 857 KiB/s | 861 KiB/s |
+| 128 KiB | 592 KiB/s | 1669 KiB/s |
+| 256 KiB | 706 KiB/s | 2455 KiB/s |
+| 512 KiB | 689 KiB/s | 5701 KiB/s |
+
+The final absolute value cannot be accepted: it exceeds the negotiated 5 MB/s
+bus rate, and every synchronous VBlank sample in that section contains the
+same impossible approximately 1762-second gap. Correctness, chunk counts and
+the relative ENF advantage remain useful, but the concurrent VBlank/EClock
+instrumentation has contaminated the aggregate timing. V8 removes that probe
+from synchronous tests and instead sums the four per-command microsecond
+measurements made directly around `DoIO`, reporting their minimum and maximum
+as a variability check.
 
 ### Startup logging stall
 

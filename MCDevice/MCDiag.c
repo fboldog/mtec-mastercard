@@ -748,7 +748,7 @@ static void sync_tests(void)
     };
     UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     struct MCSyncReq sr;
-    ULONG k, i, j, m, nmodes, len, nb, bad, t0, dt, vbmax;
+    ULONG k, i, j, m, nmodes, len, nb, bad, sumus, minus, maxus;
     LONG e;
 
     P("\n== SYNC diagnostic: read-only, ask 5 MB/s offset 4 ==\n");
@@ -827,15 +827,20 @@ static void sync_tests(void)
             UBYTE mode = m ? MCMODE_EXT24 : MCMODE_DMA16;
             const char *counter = m ? "24" : "16";
             memset(got, 0x5A, len + 16);
-            vb_start();
-            t0 = now();
             e = 0;
-            for (j = 0; j < 4; j++)
-                if ((e = run(mode, cdb, 10, 1, got, len)) ||
-                    dr.status || dr.actual != len)
+            sumus = 0;
+            minus = ~0UL;
+            maxus = 0;
+            for (j = 0; j < 4; j++) {
+                e = run(mode, cdb, 10, 1, got, len);
+                sumus += lastus;
+                if (lastus < minus)
+                    minus = lastus;
+                if (lastus > maxus)
+                    maxus = lastus;
+                if (e || dr.status || dr.actual != len)
                     break;
-            dt = now() - t0;
-            vbmax = vb_stop();
+            }
             bad = 0;
             if (!e && !dr.status && dr.actual == len) {
                 for (i = 0; i < len && got[i] == ref[i]; i++) ;
@@ -856,8 +861,9 @@ static void sync_tests(void)
                 sync_diff_bytes();
             } else {
                 oks++;
-                P("SYNC%s %7lu B x4 same %lu KB/s, VBlank gap max %lu us",
-                  (ULONG)counter, len, dt ? (len >> 8) * efreq / dt : 0, vbmax);
+                P("SYNC%s %7lu B x4 same %lu KB/s, %lu..%lu us/cmd",
+                  (ULONG)counter, len,
+                  sumus ? (len >> 8) * 1000000UL / sumus : 0, minus, maxus);
             }
             stats();
             if (e || dr.status || dr.actual != len || bad)
