@@ -463,6 +463,23 @@ reads a pattern synchronously, resets the bus to async, then restores and
 verifies the original block asynchronously. The restore path runs after any
 sync write/read failure; the ordinary read-only sync script remains unchanged.
 
+The v11 logs are
+[`logs/mcdiag-25-sync-v11-write.log`](logs/mcdiag-25-sync-v11-write.log) and
+[`logs/mcdiag-25-sync-v11-read.log`](logs/mcdiag-25-sync-v11-read.log). The
+synchronous one-block write and readback were exact (`b0 w256 q0`), the bus
+reset returned the target to async, and the original LBA 15711956 was restored
+and verified asynchronously. The run finished at 96/0/1. This validates both
+synchronous directions and the failure-safe restoration sequence.
+
+The CF94 manual requires Configuration 3 `FASTSCSI` to be clear at transfer
+rates of 5 MB/s or below, and set with `FASTCLK` for rates above 5 MB/s. Earlier
+diagnostics inherited `$18` from initialization at every rate; v12 uses `$08`
+for async/5 MB/s and selects `$18` per command only when the negotiated chip
+period is below eight clocks. Its separate read-only `S:sync-fast-test` resets
+between steps and asks for SDTR factors 50, 43, 37, 31 and 25, corresponding
+to the CF94's supported 5.0, 5.7, 6.6, 8.0 and 10.0 MB/s timings. Each accepted
+rate must pass two individually poisoned 512 KiB ENF reads before proceeding.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

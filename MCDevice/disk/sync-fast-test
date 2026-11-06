@@ -1,0 +1,7 @@
+; Read-only negotiated synchronous-speed ladder. Tests 5.0 through 10.0 MB/s,
+; validates two 512 KiB reads at each accepted rate and resets between steps.
+FailAt 21
+Echo "Experimental sync speed ladder: read-only, 5 through 10 MB/s."
+Set u `MCDiag FINDUNIT`
+MCDiag UNIT $u SYNC FAST LOG DF0:mcsync-fast.log
+Echo "Done. The log is DF0:mcsync-fast.log."

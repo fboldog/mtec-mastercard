@@ -157,7 +157,7 @@ void esp_init(struct MC *mc)
     wr(mc, R_CLKCONV, 0);               /* 40 MHz */
     wr(mc, R_TIMEOUT, 0x99);            /* 250 ms select time-out at 40 MHz */
     wr(mc, R_CFG2, CFG2_NORMAL);
-    wr(mc, R_CFG3, 0x18);               /* fast clock */
+    wr(mc, R_CFG3, CFG3_FASTCLK);        /* 40 MHz clock, normal <=5 MB/s timing */
     wr(mc, R_CFG4, 0x04);               /* active negation */
     wr(mc, R_SYNCPER, 0);
     wr(mc, R_SYNCOFF, 0);               /* asynchronous */
@@ -977,6 +977,7 @@ LONG esp_sync(struct MC *mc, UBYTE target, UBYTE lun, struct MCSyncReq *r)
         return 0;
     }
     mc->ipending = 0;
+    wr(mc, R_CFG3, CFG3_FASTCLK);        /* SDTR itself starts asynchronously */
     wr(mc, R_SYNCPER, 0);
     wr(mc, R_SYNCOFF, 0);
     wr(mc, R_CMD, C_FLUSH);
@@ -1035,6 +1036,8 @@ LONG esp_sync(struct MC *mc, UBYTE target, UBYTE lun, struct MCSyncReq *r)
     if ((mc->istat & ST_PHASE) != PH_CMD)
         return sync_failed(mc, r, 13, HFERR_Phase);
 
+    wr(mc, R_CFG3, CFG3_FASTCLK |
+       (r->offset && r->chip_period < 8 ? CFG3_FASTSCSI : 0));
     wr(mc, R_SYNCPER, r->chip_period);
     wr(mc, R_SYNCOFF, r->offset);
     wr(mc, R_CMD, C_FLUSH);
@@ -1083,6 +1086,8 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
        command on the real CF94 even though the data itself was correct. */
     if (extended)
         wr(mc, R_CFG2, CFG2_NORMAL | CFG2_ENF);
+    wr(mc, R_CFG3, CFG3_FASTCLK |
+       (c->sync_offset && c->sync_period < 8 ? CFG3_FASTSCSI : 0));
     wr(mc, R_CMD, C_FLUSH);
     wr(mc, R_DESTID, target);
     wr(mc, R_SYNCPER, c->sync_period);

@@ -383,7 +383,9 @@ asynchronous mode before returning. The validated 512 KiB path reaches about
 4672 KiB/s. `Execute S:sync-write-test` is the separate Data-Out test: it saves
 one block near the end of the medium asynchronously, tests a synchronous write
 and read, then resets to async and restores and verifies the original. Normal
-driver operation never enables sync automatically.
+driver operation never enables sync automatically. After both tests pass,
+`Execute S:sync-fast-test` performs a read-only negotiated ladder from 5 to
+10 MB/s, validating two 512 KiB reads and resetting the bus at every step.
 
 On the real card (A1200, Kickstart 3.0, BlueSCSI Pico, original EPROM with the
 takeover), see `MCDevice/logs/`:

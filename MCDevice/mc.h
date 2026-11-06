@@ -100,6 +100,8 @@ static inline void NewList(struct List *l)
 #define CFG2_ENF   0x40     /* CF94 extensions, including the 24-bit counter */
 #define CFG2_S2FE  0x08     /* SCSI-2 extended messages and group-2 CDBs */
 #define CFG2_ACDPE 0x04     /* abort a command/data phase on a parity error */
+#define CFG3_FASTSCSI 0x10  /* Fast-SCSI timings: only for rates above 5 MB/s */
+#define CFG3_FASTCLK  0x08  /* controller input clock is above 25 MHz */
 
 /* Interrupt register */
 #define IN_RESET   0x80
