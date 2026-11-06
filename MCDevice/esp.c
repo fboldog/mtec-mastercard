@@ -19,7 +19,7 @@ void *memset(void *d, int c, unsigned long n);
 #define REG(mc, n) ((mc)->board[MC_REGS + ((n) << 3)])
 #define SPIN_LIMIT 0x00080000UL     /* polls without progress before a DMA chunk gives up, ~0.5 s */
 #define MAX_PHASES 64
-#define MAX_EXT_PHASE 0x00100000UL  /* diagnostic 24-bit phases stop at 1 MiB */
+#define MAX_EXT_PHASE 0x00080000UL  /* 1 MiB failed on hardware; stop at 512 KiB */
 #define CFG2_NORMAL (CFG2_S2FE | CFG2_ACDPE)
 
 /* The short wait avoids a timer request and task switch for fast commands.
@@ -198,6 +198,7 @@ void fast16_out_ready(struct Fast *f __asm("a0"));
 void fast32_in(struct Fast *f __asm("a0"));     /* MCMODE_DMA32: 32 bytes per flag */
 void movem16_in(struct Fast *f __asm("a0"));    /* MCMODE_MOVEM: two movem.l per flag */
 void rom16_in(struct Fast *f __asm("a0"));      /* original ROM: CF94 count is the bound */
+void rom16_in_ready(struct Fast *f __asm("a0"));
 __asm(
 "  .text\n"
 "  .globl _fast16_in_ready\n"
@@ -412,6 +413,13 @@ __asm(
 "  move.l d0,12(a0)\n"
 "  movem.l (sp)+,d2-d6/a2-a5\n"
 "  rts\n"
+"  .globl _rom16_in_ready\n"
+"  _rom16_in_ready:\n"
+"  movem.l d2/a2-a5,-(sp)\n"
+"  movem.l (a0),a2-a4\n"
+"  movea.l 16(a0),a5\n"
+"  move.l 20(a0),d1\n"
+"  bra.s 3f\n"
 "  .globl _rom16_in\n"
 "  _rom16_in:\n"
 "  movem.l d2/a2-a5,-(sp)\n"
@@ -509,13 +517,15 @@ static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
         f.stat = &REG(mc, R_STAT);
         f.limit = MC_IRQ_ROUNDS;        /* rounds of 8 flag tests before leaving */
         f.status = 0;
-        if (x->in)
+        if (x->in && x->rom)
+            rom16_in_ready(&f);
+        else if (x->in)
             fast16_in_ready(&f);
         else
             fast16_out_ready(&f);
         if (f.status & ST_INT)
             *sampled_status = f.status;
-        x->st.bursts += (x->left >> 4) - f.bursts;
+        x->st.bursts += ((UBYTE *)f.buf - x->p) >> 4;
         x->left -= (UBYTE *)f.buf - x->p;
         x->p = (UBYTE *)f.buf;
     }
@@ -605,6 +615,7 @@ static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     struct Xfer *x = &mc->x;
     ULONG left = c->len - c->actual;
     int extended = c->mode == MCMODE_EXT24;
+    int rom = c->mode == MCMODE_ROM16;
     ULONG max = extended ? MAX_EXT_PHASE : 0x10000;
     ULONG n = left > max ? max : left;
 
@@ -614,6 +625,7 @@ static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     x->n = n;
     x->in = c->in;
     x->extended = extended;
+    x->rom = rom;
     x->moved = 0;
     load_count(mc, n, extended);
     mc->ipending = 0;
@@ -872,7 +884,7 @@ static LONG data_phase(struct MC *mc, struct Cmd *c)
     if (c->mode == MCMODE_PIO)
         return pio_phase(mc, c, st);
 #ifdef IRQXFER
-    if (c->mode == MCMODE_DMA16 || c->mode == MCMODE_EXT24)
+    if (c->mode == MCMODE_DMA16 || c->mode == MCMODE_ROM16 || c->mode == MCMODE_EXT24)
         return irq_phase(mc, c, st);    /* the other modes stay polled, for MCDiag */
 #endif
     return dma_phase(mc, c, st);

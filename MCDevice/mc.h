@@ -123,7 +123,7 @@ struct Xfer {
     ULONG left;             /* bytes still to move in this chunk */
     ULONG n;                /* the chunk */
     ULONG moved;            /* what the chip moved, set at the end */
-    UBYTE in, active, extended, pad;
+    UBYTE in, active, extended, rom;
     struct MCStats st;
 };
 

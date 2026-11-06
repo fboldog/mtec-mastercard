@@ -350,12 +350,12 @@ driver mode automatically:
 | `DMA32` | moves 32 bytes per `$C039`; faster, but the flag only guarantees 16 |
 | `MOVEM` | uses `movem.l`; retained as the known-slower comparison |
 | `ROM16` | matches M-Tec's four-`move.l` loop and trusts the CF94 transfer counter instead of checking a software buffer bound |
-| `EXT24` | enables the CF94 24-bit counter and compares single 128, 256, 512 KiB and 1 MiB phases with ordinary 64 KiB phases |
+| `EXT24` | enables the CF94 24-bit counter and compares single 128, 256 and 512 KiB phases with ordinary 64 KiB phases |
 
 `ROM16` is read-only and diagnostic because a faulty stuck DREQ would have no
 software buffer bound. `EXT24` follows AMD's required DMA-NOP/count-load
 sequence, restores the normal configuration after each phase and is capped at
-1 MiB. MCDiag allocates about 2.1 MiB for the large comparisons and reports a
+512 KiB. MCDiag allocates about 1.1 MiB for the large comparisons and reports a
 clean skip if that memory is unavailable.
 
 The tests:

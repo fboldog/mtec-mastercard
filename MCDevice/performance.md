@@ -20,11 +20,11 @@ as a comparison.
 |---|---|---|
 | CF94 error handling | Gross and parity status bits were recorded but ignored. Parity reporting was disabled. This made sync or aggressive DMA experiments unsafe. | Implemented on this branch, with real-hardware validation pending: parity reporting and abort-on-parity are enabled; parity returns `HFERR_Parity`, gross error returns `HFERR_DMA`, and the bus is reset. |
 | Short interrupt poll | `FAST_POLLS=4000` represented about 1 ms at 50 MHz, but was machine-specific. | It is now `80 * MC_CPU_MHZ`, with a 42 MHz default (3360 polls) and build-time overrides. |
-| DMA transfer count | The normal path uses 16 bits and restarts the data phase every 64 KiB. AMD documents a 24-bit counter behind `CFG2.ENF`, loaded after DMA NOP. | Implemented as private MCDiag mode `EXT24`, capped at 1 MiB and never selected automatically. It compares 128, 256, 512 KiB and 1 MiB phases with normal DMA16. Real-hardware validation pending. |
+| DMA transfer count | The normal path uses 16 bits and restarts the data phase every 64 KiB. AMD documents a 24-bit counter behind `CFG2.ENF`, loaded after DMA NOP. | Implemented as private MCDiag mode `EXT24`, capped at 512 KiB and never selected automatically. The first hardware run passed at 128, 256 and 512 KiB; a 1 MiB phase corrupted timing state and was rejected. |
 | DMA16 | The `$C039` path is correct and fastest among the guaranteed board modes. | Production default. |
 | DMA32 | Skipping every second `$C039` check was about 8% faster in MCDiag, but the flag only guarantees 16 bytes. | Diagnostic experiment only; do not auto-select. |
-| Original-ROM loop | M-Tec omits MCDevice's software burst bound and trusts the CF94 counter. This removes `subq`/`beq` from each 16 bytes but a stuck DREQ could overwrite memory. | Implemented as read-only MCDiag mode `ROM16`; diagnostic only. Guard bytes and data are checked after timed reads. |
-| IRQ loop entry | IRQ code tested `$C039`, then the assembly loop tested it again and saved four unused data registers. The loop also discarded a status value that C reread. | Implemented: ready-entry variants consume the guaranteed 16 bytes immediately, DMA16 saves only the registers it uses, and sampled interrupt status is returned to C. Hardware validation pending. |
+| Original-ROM loop | M-Tec omits MCDevice's software burst bound and trusts the CF94 counter. This removes `subq`/`beq` from each 16 bytes but a stuck DREQ could overwrite memory. | Implemented as read-only MCDiag mode `ROM16`; diagnostic only. Guard bytes and data are checked after timed reads. It now uses the same IRQ path as DMA16 so their timings are comparable. |
+| IRQ loop entry | IRQ code tested `$C039`, then the assembly loop tested it again and saved four unused data registers. The loop also discarded a status value that C reread. | Implemented: ready-entry variants consume the guaranteed 16 bytes immediately, DMA16 saves only the registers it uses, and sampled interrupt status is returned to C. The first hardware run passed all normal integrity tests. |
 | IRQ wait | Small commands normally finish inside the short poll and report zero timer sleeps, so they consume CPU while waiting. | Tune `MC_FAST_POLLS` for throughput versus task responsiveness. |
 | Bulk IRQ behavior | A 64 KiB read normally takes two server entries and zero timer sleeps. M-Tec's disassembled handler uses the same four-longword transfer and a similar run of DREQ tests. | `MC_FAST_POLLS` cannot materially accelerate the bulk inner loop. |
 | IRQ duration | Exec recommends deferring lengthy interrupt work, but the board holds INT2 active while DREQ is asserted. Returning without moving the data would immediately retrigger the PORTS interrupt, and the byte-exact original-ROM disassembly uses no mask or acknowledge register. | Keep the IRQ copy. A software interrupt alone does not solve this; a card-local mask would require new hardware evidence. |
@@ -41,7 +41,7 @@ experiments.
 |---|---:|---:|
 | `MC_FAST_POLLS` | 3360 | 512, 1024, 1680, 2520, 3360 |
 | `MC_IRQ_ROUNDS` | 4 | 1, 2, 4, 8 |
-| IRQ DMA phase | 64 KiB | MCDiag `EXT24`: 128, 256, 512 KiB and 1 MiB |
+| IRQ DMA phase | 64 KiB | MCDiag `EXT24`: 128, 256 and 512 KiB |
 | Small-transfer mode | IRQ | IRQ or polled below 4, 8 and 16 KiB |
 | Board transfer | DMA16 | DMA16 |
 | SCSI transfer | asynchronous | asynchronous |
@@ -94,6 +94,26 @@ containment is accepted explicitly.
 set `CFG2.ENF`, issue DMA NOP, then load registers `$00`, `$01` and `$0E`.
 MCDevice clears ENF after the phase so the normal zero-count value continues to
 mean 64 KiB rather than the extended 16 MiB maximum.
+
+## First hardware experiment run
+
+The first run of `MCTest-perf-irq-tested.adf` completed the normal read suite
+with 84 passes, no failures and one unsupported WRITE/READ BUFFER skip. Its
+complete console capture is in
+[`logs/mcdiag-10-perf-experiments.log`](logs/mcdiag-10-perf-experiments.log).
+
+| Test | Result | Interpretation |
+|---|---:|---|
+| IRQ DMA16, 64 KiB x16 | 3856 KiB/s | Safe baseline; data and guard checks passed. |
+| DMA32, 64 KiB x16 | 4188 KiB/s | About 8.6% faster, but still unsafe because `$C039` guarantees only 16 bytes. |
+| MOVEM, 64 KiB x16 | 3474 KiB/s | Confirms that `movem.l` is slower. |
+| ROM16, 64 KiB x16 | 3944 KiB/s | About 2.3% faster in this build, but it accidentally used the polled path; the next image routes it through IRQ for a fair comparison. |
+| EXT24, 128/256/512 KiB | 5488/5685/5679 KiB/s | All three data checks passed, but this build did not time matching DMA16 command sizes. The corrected sweep reports both modes at each size. |
+| EXT24, 1 MiB | invalid | The impossible 12393 KiB/s result and corrupted VBlank duration show memory/state corruption even though the immediate data comparison passed. Single phases are therefore capped at 512 KiB. |
+
+The following `READ_CAPACITY_16` returned `HFERR_DMA`, which is another reason
+not to retain the 1 MiB experiment. Requests larger than 512 KiB remain valid:
+the driver divides them into multiple extended-count phases.
 
 Motorola's MC68030 User's Manual adds the following constraints:
 

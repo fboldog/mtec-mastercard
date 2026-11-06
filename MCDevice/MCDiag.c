@@ -15,7 +15,7 @@
  * A speed section times 16 reads of 64 KB per mode and one-block commands,
  * with the longest gap between vertical blank interrupts during the reads.
  * DMA32, MOVEM, ROM16 (the original unbounded loop) and EXT24 (one DMA phase
- * up to 1 MiB) are comparisons only; they don't count as failures.
+ * up to 512 KiB) are comparisons only; they don't count as failures.
  *
  * Read-only unless WRITE is given. The buffer tests write the drive's own
  * buffer (WRITE BUFFER / READ BUFFER), not the medium. WRITE adds medium
@@ -61,7 +61,7 @@ static const char vers[] __attribute__((used)) = "$VER: MCDiag 0.1 (4.11.2026)";
 
 #define DEV_NAME "mastercard.device"
 #define BUFSIZE     (0x10000 + 0x1000 + 16)
-#define BIGBUFSIZE  (0x100000 + 0x1000 + 16)
+#define BIGBUFSIZE  (0x80000 + 0x1000 + 16)
 #define PIO_MAX  4096    /* longest PIO transfer worth waiting for */
 
 static BPTR logfh;
@@ -604,50 +604,63 @@ static void speed_tests(void)
     }
     {
         /* EXT24 is deliberately separate: its benefit is avoiding the 64 KiB
-           phase restarts, so compare it at 128 KiB through 1 MiB. */
-        static const ULONG sizes[] = { 0x20000, 0x40000, 0x80000, 0x100000 };
-        if (workbufsize < 0x100000 + 16) {
-            P("EXT24 sweep       skipped: large test buffers unavailable\n");
+           phase restarts.  Time identical DMA16 and EXT24 commands so the
+           result measures that difference rather than command size. */
+        static const ULONG sizes[] = { 0x20000, 0x40000, 0x80000 };
+        static const UBYTE xmodes[] = { MCMODE_DMA16, MCMODE_EXT24 };
+        if (workbufsize < 0x80000 + 16) {
+            P("PHASE sweep       skipped: large test buffers unavailable\n");
             skips++;
         } else for (k = 0; k < sizeof sizes / sizeof sizes[0]; k++) {
-            ULONG nb, bad = 0, err = 0;
+            ULONG nb;
             len = sizes[k];
             nb = len / bsize;
             cdb[7] = nb >> 8;
             cdb[8] = nb;
             memset(ref, 0xA5, len + 16);
             if (run(MCMODE_DMA16, cdb, 10, 1, ref, len) || dr.status || dr.actual != len || ref[len] != 0xA5) {
-                P("EXT24 %7lu B     reference failed, skipped\n", len);
+                P("PHASE %7lu B     reference failed, skipped\n", len);
                 skips++;
                 continue;
             }
-            memset(got, 0x5A, len + 16);
-            vb_start();
-            t0 = now();
-            for (j = 0; j < 4; j++)
-                if (run(MCMODE_EXT24, cdb, 10, 1, got, len) || dr.status || dr.actual != len) {
-                    err++;
-                    break;
+            for (i = 0; i < sizeof xmodes; i++) {
+                UBYTE m = xmodes[i];
+                ULONG q, bad = 0, err = 0;
+                if (skipmode[m])
+                    continue;
+                memset(got, 0x5A, len + 16);
+                vb_start();
+                t0 = now();
+                for (j = 0; j < 4; j++)
+                    if (run(m, cdb, 10, 1, got, len) || dr.status || dr.actual != len) {
+                        err++;
+                        break;
+                    }
+                dt = now() - t0;
+                vbmax = vb_stop();
+                if (!err) {
+                    for (q = 0; q < len && got[q] == ref[q]; q++) ;
+                    if (q != len)
+                        bad = q + 1;
+                    else for (q = len; q < len + 16; q++)
+                        if (got[q] != 0x5A) {
+                            bad = q + 1;
+                            break;
+                        }
                 }
-            dt = now() - t0;
-            vbmax = vb_stop();
-            if (!err) {
-                for (i = 0; i < len && got[i] == ref[i]; i++) ;
-                if (i != len)
-                    bad = i + 1;
-                else if (got[len] != 0x5A)
-                    bad = len + 1;
+                if (err)
+                    P("PHASE %7lu B x4  %-5s ERR %ld %lu/%lu", len,
+                      (ULONG)mname[m], dr.err, dr.actual, len);
+                else if (bad)
+                    P("PHASE %7lu B x4  %-5s DIFF/OVER @%lx", len,
+                      (ULONG)mname[m], bad - 1);
+                else {
+                    oks++;
+                    P("PHASE %7lu B x4  %-5s same %lu KB/s, VBlank gap max %lu us", len,
+                      (ULONG)mname[m], dt ? (len >> 10) * 4 * efreq / dt : 0, vbmax);
+                }
+                stats();
             }
-            if (err)
-                P("EXT24 %7lu B x4  ERR %ld %lu/%lu", len, dr.err, dr.actual, len);
-            else if (bad)
-                P("EXT24 %7lu B x4  DIFF/OVER @%lx", len, bad - 1);
-            else {
-                oks++;
-                P("EXT24 %7lu B x4  same %lu KB/s, VBlank gap max %lu us", len,
-                  dt ? (len >> 10) * 4 * efreq / dt : 0, vbmax);
-            }
-            stats();
         }
     }
     {
