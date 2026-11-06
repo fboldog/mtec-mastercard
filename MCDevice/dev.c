@@ -39,7 +39,7 @@ __asm("  .text\n  moveq #-1,d0\n  rts\n");
 #define VERSION    0
 #define REVISION   1
 #define TASK_STACK 4096
-#define MAX_XFER   0x100000UL   /* bytes per SCSI command, in 64 KB DMA chunks */
+#define MAX_XFER   0x100000UL   /* bytes per SCSI command; data phases are capped separately */
 #define MC_PROBE   0x7FF0       /* private: open a unit */
 #define MC_MOUNT   0x7FF2       /* private, ROM build: add the partitions at start-up */
 #define TRIES      3
@@ -107,6 +107,8 @@ static LONG scsi(struct MC *mc, struct MCUnit *u, UBYTE *cdb, UWORD cdblen, void
     LONG err = 0;
     for (t = 0; t < TRIES; t++) {
         struct Cmd c = { cdb, cdblen, in, 0, data, len, 0, 0, 0 };
+        if (in && len >= MC_EXT_READ_MIN)
+            c.mode = MCMODE_EXT24;
         err = esp_exec(mc, u->target, u->lun, &c);
         if (actual)
             *actual = c.actual;
@@ -269,11 +271,13 @@ static void scsicmd(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
         ior->io_Error = IOERR_BADLENGTH;
         return;
     }
+    memset(&c, 0, sizeof c);
     c.cdb = sc->scsi_Command;
     c.cdblen = sc->scsi_CmdLength;
     c.in = sc->scsi_Flags & SCSIF_READ;
     c.data = (UBYTE *)sc->scsi_Data;
     c.len = sc->scsi_Length;
+    c.mode = c.in && c.len >= MC_EXT_READ_MIN ? MCMODE_EXT24 : MCMODE_DMA16;
     sc->scsi_Actual = 0;
     sc->scsi_CmdActual = 0;
     sc->scsi_SenseActual = 0;

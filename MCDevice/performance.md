@@ -20,7 +20,7 @@ as a comparison.
 |---|---|---|
 | CF94 error handling | Illegal-operation and parity status bits were recorded but ignored. Parity reporting was disabled. This made sync or aggressive DMA experiments unsafe. | Parity reporting and abort-on-parity are enabled; parity returns `HFERR_Parity`, illegal operation returns `HFERR_DMA`, and the bus is reset. Hardware testing exposed and localized the pre-existing 16-byte-CDB FIFO overflow. |
 | Short interrupt poll | `FAST_POLLS=4000` represented about 1 ms at 50 MHz, but was machine-specific. | It is now `80 * MC_CPU_MHZ`, with a 42 MHz default (3360 polls) and build-time overrides. |
-| DMA transfer count | The normal path uses 16 bits and restarts the data phase every 64 KiB. The NCR 53CF94/96-2 manual documents a 24-bit counter behind `CFG2.ENF`, loaded after DMA NOP. | Private MCDiag mode `EXT24`, capped at 512 KiB. Two matched-size runs show a small, variable benefit averaging about 2%. It remains diagnostic pending a completely regression-free run and is not selected automatically. |
+| DMA transfer count | The original path uses 16 bits and restarts the data phase every 64 KiB. The NCR 53CF94/96-2 manual documents a 24-bit counter behind `CFG2.ENF`, loaded after DMA NOP. | Three matched-size runs passed through 512 KiB. The 512 KiB result was consistently 2.0-3.5% faster, so normal reads of at least 512 KiB now use extended-count phases capped at 512 KiB. Writes and shorter reads retain DMA16. |
 | DMA16 | The `$C039` path is correct and fastest among the guaranteed board modes. | Production default. |
 | DMA32 | Skipping every second `$C039` check was about 8% faster in MCDiag, but the flag only guarantees 16 bytes. | Diagnostic experiment only; do not auto-select. |
 | Original-ROM loop | M-Tec omits MCDevice's software burst bound and trusts the CF94 counter. This removes `subq`/`beq` from each 16 bytes but a stuck DREQ could overwrite memory. | Rejected for production. In the fair IRQ comparison it measured 3844 KiB/s against DMA16's 3841 KiB/s: no useful gain for losing the software bound. |
@@ -155,12 +155,33 @@ it. The EXT24 comparisons themselves all passed and were about 2% faster:
 | 512 KiB | 5561 KiB/s | 5672 KiB/s | +2.0% |
 
 The failure was introduced before EXT24, when the driver began treating CF94
-status bit 6 as fatal. AMD calls that bit Illegal Operation Error, not Gross
+status bit 6 as fatal. NCR calls that bit Illegal Operation Error, not Gross
 Error; FIFO overflow is one documented cause. MCDevice put IDENTIFY plus a
 16-byte group-4 CDB into the chip's 16-byte FIFO, while the CF94 selection steps
 only recognize group 4 as a reserved six-byte command. Earlier builds ignored
 the resulting error. The corrected path uses Select with ATN and Stop, sends a
 NO OPERATION message, and transfers the 16-byte CDB separately in command phase.
+
+### Clean 16-byte-CDB run and promotion decision
+
+The fourth capture is in
+[`logs/mcdiag-13-perf-cdb16-fixed.log`](logs/mcdiag-13-perf-cdb16-fixed.log).
+The immediate READ CAPACITY(16) check and devtest's later check both passed.
+MCDiag completed with 87 passes, no failures and one unsupported buffer-command
+skip; devtest's normal 512 KiB result was 5881 KiB/s.
+
+| Size | DMA16 | EXT24 | EXT24 difference |
+|---:|---:|---:|---:|
+| 128 KiB | 5440 KiB/s | 5422 KiB/s | -0.3% |
+| 256 KiB | 5611 KiB/s | 5681 KiB/s | +1.2% |
+| 512 KiB | 5565 KiB/s | 5686 KiB/s | +2.2% |
+
+Across the three fair runs, EXT24 averaged about +1.4%, +1.1% and +2.6% at
+128, 256 and 512 KiB respectively. Only the 512 KiB result was positive in all
+three runs. The production threshold is therefore deliberately conservative:
+reads of at least 512 KiB use one or more extended phases of at most 512 KiB;
+shorter reads and all writes keep the bounded 16-bit-count path. The diagnostic
+DMA16 mode remains an unmodified baseline for future comparisons.
 
 The two fair IRQ ROM16 runs differed from bounded DMA16 by 0.08% and 1.7%.
 That small, unstable gain does not justify removing the software buffer bound.

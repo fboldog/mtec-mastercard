@@ -343,21 +343,20 @@ Then, for each unit, every test runs in each transfer mode:
 | `WORD` | one word for each `$D039` flag |
 | `PIO` | the chip's FIFO, without the board's DMA logic |
 
-The timed speed section also runs experiments which never become the normal
-driver mode automatically:
+The timed speed section also runs transfer-loop comparisons:
 
 | Mode | Experiment |
 |---|---|
 | `DMA32` | moves 32 bytes per `$C039`; faster, but the flag only guarantees 16 |
 | `MOVEM` | uses `movem.l`; retained as the known-slower comparison |
 | `ROM16` | matches M-Tec's four-`move.l` loop and trusts the CF94 transfer counter instead of checking a software buffer bound |
-| `EXT24` | enables the CF94 24-bit counter and compares single 128, 256 and 512 KiB phases with ordinary 64 KiB phases |
+| `EXT24` | enables the CF94 24-bit counter and compares single 128, 256 and 512 KiB phases with ordinary 64 KiB phases; validated 512 KiB phases are also used automatically for normal reads of at least 512 KiB |
 
 `ROM16` is read-only and diagnostic because a faulty stuck DREQ would have no
-software buffer bound. `EXT24` follows AMD's required DMA-NOP/count-load
-sequence, restores the normal configuration after each phase and is capped at
-512 KiB. MCDiag allocates about 1.1 MiB for the large comparisons and reports a
-clean skip if that memory is unavailable.
+software buffer bound. `EXT24` follows NCR's required DMA-NOP/count-load
+sequence, restores the normal configuration after each command and caps each
+phase at 512 KiB. MCDiag allocates about 1.1 MiB for the large comparisons and
+reports a clean skip if that memory is unavailable.
 
 The tests:
 - **INQUIRY, REQUEST SENSE and MODE SENSE**, with odd and even lengths.

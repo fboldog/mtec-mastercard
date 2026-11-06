@@ -35,6 +35,12 @@ static inline void NewList(struct List *l)
 #define MC_MANUFACTURER 2192
 #define MC_PRODUCT      33
 
+/* Three hardware runs found a repeatable benefit only at the largest tested
+   size. Keep writes and shorter reads on the proven 16-bit-count path. */
+#ifndef MC_EXT_READ_MIN
+#define MC_EXT_READ_MIN 0x00080000UL    /* 512 KiB */
+#endif
+
 #define MC_REGS     0xC000
 #define MC_DREQ16   0xC039
 #define MC_DREQ8    0xC839
