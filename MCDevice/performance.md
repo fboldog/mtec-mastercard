@@ -29,7 +29,7 @@ as a comparison.
 | Bulk IRQ behavior | A 64 KiB read normally takes two server entries and zero timer sleeps. M-Tec's disassembled handler uses the same four-longword transfer and a similar run of DREQ tests. | `MC_FAST_POLLS` cannot materially accelerate the bulk inner loop. |
 | IRQ duration | Exec recommends deferring lengthy interrupt work, but the board holds INT2 active while DREQ is asserted. Returning without moving the data would immediately retrigger the PORTS interrupt, and the byte-exact original-ROM disassembly uses no mask or acknowledge register. | Keep the IRQ copy. A software interrupt alone does not solve this; a card-local mask would require new hardware evidence. |
 | Disconnect/reselect | IDENTIFY forbids disconnect and the driver executes one request at a time. | Low priority for one solid-state target; potentially important with multiple targets or mechanical disks. |
-| Synchronous SCSI | MCDevice deliberately selects asynchronous operation. Previous sync tests used the old driver and do not prove MCDevice cannot support it, but they showed FIFO/illegal-operation risk and no speed gain. | Do not enable until error handling has passed on hardware. Then test offsets 4 and 8 with automatic async fallback. |
+| Synchronous SCSI | Production commands remain asynchronous. Previous sync tests used the old driver, offset 15, and showed FIFO/illegal-operation risk with no speed gain. | A read-only MCDiag experiment now negotiates 5 MB/s at offset 4, checks 64/128/512 KiB reads, and resets the bus back to async. Hardware validation pending; never enabled automatically. |
 | Write performance | Correctness and restore tests exist, but comparable write-throughput measurements do not. | Add restored-area write timing before tuning the output loop. |
 
 ## Initial 42 MHz tuning matrix
@@ -202,6 +202,23 @@ The paired diagnostic 512 KiB measurement was 5702 KiB/s for DMA16 and
 only where intended. At 512 KiB the IRQ driver is now within 0.8% of the
 previously measured 6024 KiB/s M-Tec result while retaining vertical-blank and
 higher-priority interrupt service.
+
+### Production write validation
+
+The opt-in write run is in
+[`logs/mcdiag-15-perf-auto-ext512-write.log`](logs/mcdiag-15-perf-auto-ext512-write.log).
+It completed with 106 passes, no failures and the expected unsupported
+WRITE/READ BUFFER skip. Every DMA16, DMA8, WORD and PIO write/read combination
+passed for 1 and 8 blocks; the 129-block DMA writes passed as well. The original
+data was restored after every test area. Automatic extended counting remains
+read-only, so all of these writes used the bounded DMA16/DMA8/WORD/PIO paths.
+
+This clean write baseline enables the next isolated experiment. `MCDiag SYNC`
+uses the driver's private command to request SDTR factor 50 (5 MB/s), offset 4,
+then compares read-only 64, 128 and 512 KiB commands with an asynchronous
+reference. It rejects any faster/larger counterproposal, detects parity and
+illegal-operation errors, and always resets the SCSI bus back to asynchronous
+mode before returning. Production I/O never negotiates sync.
 
 The two fair IRQ ROM16 runs differed from bounded DMA16 by 0.08% and 1.7%.
 That small, unstable gain does not justify removing the software buffer bound.

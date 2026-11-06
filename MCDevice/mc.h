@@ -118,6 +118,8 @@ struct MCUnit {
     UBYTE removable;
     UBYTE shift;            /* log2 of the block size, 0 until known */
     UBYTE wprot;            /* write-protected, for TD_PROTSTATUS */
+    UBYTE sync_period;      /* CF94 register value, 0 for asynchronous */
+    UBYTE sync_offset;
     ULONG blocks;           /* last LBA + 1, 0 if unknown or over 4G */
     ULONG changes;          /* TD_CHANGENUM */
     struct List changeints;
@@ -166,12 +168,15 @@ struct Cmd {
     ULONG len;
     ULONG actual;
     UBYTE mode;             /* MCMODE_, 0 is the normal DMA */
+    UBYTE sync_period;
+    UBYTE sync_offset;
     struct MCStats *st;     /* counters for MCDiag, or 0 */
 };
 
 void esp_init(struct MC *mc);
 void esp_busreset(struct MC *mc);
 LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c);
+LONG esp_sync(struct MC *mc, UBYTE target, UBYTE lun, struct MCSyncReq *r);
 void mc_delay(struct MC *mc, ULONG micros);
 LONG mc_irq(struct MC *mc __asm("a1"));
 

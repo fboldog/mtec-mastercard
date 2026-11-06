@@ -255,6 +255,19 @@ static LONG run(UBYTE mode, const UBYTE *cdb, UWORD cdblen, UBYTE in, UBYTE *dat
     return dr.err;
 }
 
+static LONG sync_control(UBYTE period, UBYTE offset, struct MCSyncReq *r)
+{
+    memset(r, 0, sizeof *r);
+    r->ask_period = period;
+    r->ask_offset = offset;
+    io.io_Command = MCCMD_SYNC;
+    io.io_Data = r;
+    io.io_Length = sizeof *r;
+    if (DoIO((struct IORequest *)&io))
+        return io.io_Error;
+    return r->err;
+}
+
 static void stats(void)
 {
     struct MCStats *s = &dr.st;
@@ -701,6 +714,90 @@ static void speed_tests(void)
     }
 }
 
+/* Read-only, opt-in sync test. It compares against an async 512 KiB read,
+   starts with the conservative 5 MB/s / offset 4 agreement, and always resets
+   the SCSI bus back to asynchronous operation before returning. */
+static void sync_tests(void)
+{
+    static const ULONG sizes[] = { 0x10000, 0x20000, 0x80000 };
+    UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    struct MCSyncReq sr;
+    ULONG k, i, j, len, nb, bad, t0, dt, vbmax;
+    LONG e;
+
+    P("\n== SYNC diagnostic: read-only, ask 5 MB/s offset 4 ==\n");
+    if (!efreq || !bsize || workbufsize < 0x80000 + 16) {
+        P("SYNC               skipped: EClock, medium or large buffers unavailable\n");
+        skips++;
+        return;
+    }
+    len = 0x80000;
+    nb = len / bsize;
+    cdb[7] = nb >> 8;
+    cdb[8] = nb;
+    memset(ref, 0xA5, len + 16);
+    e = run(MCMODE_DMA16, cdb, 10, 1, ref, len);
+    if (e || dr.status || dr.actual != len || ref[len] != 0xA5) {
+        P("SYNC reference     ERR %ld %lu/%lu s%02lx", e, dr.actual, len, (ULONG)dr.status);
+        stats();
+        skips++;
+        return;
+    }
+    e = sync_control(50, 4, &sr);
+    if (e || !sr.offset) {
+        P("SYNC negotiate     ERR %ld step %lu reply factor %lu offset %lu [%02lx %02lx %02lx]\n",
+          e, (ULONG)sr.step, (ULONG)sr.period, (ULONG)sr.offset,
+          (ULONG)sr.stat, (ULONG)sr.intr, (ULONG)sr.seq);
+        skips++;
+        sync_control(0, 0, &sr);
+        return;
+    }
+    P("SYNC negotiated     factor %lu offset %lu, CF94 period %lu (~%lu KB/s bus)\n",
+      (ULONG)sr.period, (ULONG)sr.offset, (ULONG)sr.chip_period,
+      sr.period ? 250000UL / sr.period : 0);
+    for (k = 0; k < sizeof sizes / sizeof sizes[0]; k++) {
+        len = sizes[k];
+        nb = len / bsize;
+        cdb[7] = nb >> 8;
+        cdb[8] = nb;
+        memset(got, 0x5A, len + 16);
+        vb_start();
+        t0 = now();
+        e = 0;
+        for (j = 0; j < 4; j++)
+            if ((e = run(len == 0x80000 ? MCMODE_EXT24 : MCMODE_DMA16,
+                         cdb, 10, 1, got, len)) || dr.status || dr.actual != len)
+                break;
+        dt = now() - t0;
+        vbmax = vb_stop();
+        bad = 0;
+        if (!e && !dr.status && dr.actual == len) {
+            for (i = 0; i < len && got[i] == ref[i]; i++) ;
+            if (i != len)
+                bad = i + 1;
+            else for (i = len; i < len + 16; i++)
+                if (got[i] != 0x5A) {
+                    bad = i + 1;
+                    break;
+                }
+        }
+        if (e || dr.status || dr.actual != len)
+            P("SYNC %7lu B x4 ERR %ld %lu/%lu s%02lx", len, e, dr.actual, len, (ULONG)dr.status);
+        else if (bad)
+            P("SYNC %7lu B x4 DIFF/OVER @%lx", len, bad - 1);
+        else {
+            oks++;
+            P("SYNC %7lu B x4 same %lu KB/s, VBlank gap max %lu us", len,
+              dt ? (len >> 10) * 4 * efreq / dt : 0, vbmax);
+        }
+        stats();
+        if (e || dr.status || dr.actual != len || bad)
+            break;
+    }
+    e = sync_control(0, 0, &sr);
+    P("SYNC async restore  %s\n", (ULONG)(e ? "FAILED" : "ok (SCSI bus reset)"));
+}
+
 static int open_unit(ULONG unit)
 {
     io.io_Message.mn_ReplyPort = &port;
@@ -708,7 +805,7 @@ static int open_unit(ULONG unit)
     return !OpenDevice((STRPTR)DEV_NAME, unit, (struct IORequest *)&io, 0);
 }
 
-static void unit_tests(ULONG unit, int write, ULONG wlba)
+static void unit_tests(ULONG unit, int write, ULONG wlba, int sync)
 {
     static const UBYTE inq36[6] = { 0x12, 0, 0, 0, 36, 0 };
     static const UBYTE inq37[6] = { 0x12, 0, 0, 0, 37, 0 };
@@ -769,12 +866,14 @@ static void unit_tests(ULONG unit, int write, ULONG wlba)
     buffer_tests();
     if (write && bsize && blocks > 600)
         write_tests(wlba ? wlba : blocks - 300);
+    if (sync && !write)
+        sync_tests();
 }
 
 LONG start(void)
 {
     LONG rc = RETURN_FAIL;
-    LONG args[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+    LONG args[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     struct RDArgs *ra;
     ULONG unit, first, last;
 
@@ -782,7 +881,7 @@ LONG start(void)
     DOSBase = (struct DosLibrary *)OpenLibrary((STRPTR)"dos.library", 37);
     if (!DOSBase)
         return rc;
-    ra = (struct RDArgs *)ReadArgs((STRPTR)"UNIT/N,TAKEOVER/S,WRITE/S,LBA/N,LOG/K,FINDUNIT/S,NODMA8/S,NOPIO/S", args, 0);
+    ra = (struct RDArgs *)ReadArgs((STRPTR)"UNIT/N,TAKEOVER/S,WRITE/S,LBA/N,LOG/K,FINDUNIT/S,NODMA8/S,NOPIO/S,SYNC/S", args, 0);
     if (!ra) {
         PrintFault(IoErr(), (STRPTR)"MCDiag");
         goto done;
@@ -850,7 +949,7 @@ LONG start(void)
                     P("Unit %lu: open failed, error %ld\n", unit, (LONG)io.io_Error);
             continue;
         }
-        unit_tests(unit, args[2] != 0, args[3] ? *(ULONG *)args[3] : 0);
+        unit_tests(unit, args[2] != 0, args[3] ? *(ULONG *)args[3] : 0, args[8] != 0);
         CloseDevice((struct IORequest *)&io);
     }
     P("\nRESULT %lu ok, %lu failed, %lu skipped\n", oks, fails, skips);

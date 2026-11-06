@@ -376,6 +376,11 @@ The defaults only read the disk. `Execute S:write-test` adds disk writes 300
 blocks before the end: each block is saved, written in every mode, read back,
 checked, and restored.
 
+`Execute S:sync-test` is a separate, experimental read-only test. It asks the
+target for conservative 5 MB/s synchronous transfers at offset 4, compares
+64, 128 and 512 KiB reads, and resets the SCSI bus back to asynchronous mode
+before returning. Normal driver operation never enables sync automatically.
+
 On the real card (A1200, Kickstart 3.0, BlueSCSI Pico, original EPROM with the
 takeover), see `MCDevice/logs/`:
 

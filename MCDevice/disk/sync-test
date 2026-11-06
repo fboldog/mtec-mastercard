@@ -1,0 +1,7 @@
+; Opt-in, read-only synchronous-SCSI diagnostic. Run after the normal test.
+FailAt 21
+Echo "Conservative sync diagnostic: 5 MB/s, offset 4, reads only."
+Echo "It will reset the SCSI bus back to async before returning."
+Set u `MCDiag FINDUNIT`
+MCDiag UNIT $u SYNC LOG DF0:mcsync.log
+Echo "Done. The log is DF0:mcsync.log (More DF0:mcsync.log)."

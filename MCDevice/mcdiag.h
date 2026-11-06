@@ -11,6 +11,7 @@
 #include <exec/types.h>
 
 #define MCCMD_DIAG    0x7FF1
+#define MCCMD_SYNC    0x7FF3     /* private: negotiate sync, or reset to async */
 
 #define MCMODE_DMA16  0     /* 16 bytes per $C039, words at the end: the normal mode */
 #define MCMODE_DMA8   1     /* 8 bytes per $C839, words at the end */
@@ -51,6 +52,18 @@ struct MCDiagReq {
     UBYTE status;           /* SCSI status, 0xFF if none */
     UBYTE pad[3];
     struct MCStats st;
+};
+
+struct MCSyncReq {
+    UBYTE ask_period;       /* SCSI period factor (50 = 5 MB/s), 0 resets async */
+    UBYTE ask_offset;
+    UBYTE period;           /* target's reply */
+    UBYTE offset;
+    UBYTE chip_period;      /* value programmed into the CF94 */
+    UBYTE step;             /* negotiation step which failed, 0 on success */
+    UBYTE stat, intr, seq;  /* final/failing chip registers */
+    UBYTE pad[3];
+    LONG err;
 };
 
 #endif

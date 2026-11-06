@@ -80,7 +80,15 @@ static LONG scsi(struct MC *mc, struct MCUnit *u, UBYTE *cdb, UWORD cdblen, void
 static LONG sense(struct MC *mc, struct MCUnit *u)
 {
     UBYTE cdb[6] = { 0x03, 0, 0, 0, sizeof mc->sense, 0 };
-    struct Cmd c = { cdb, 6, 1, 0, mc->sense, sizeof mc->sense, 0, 0, 0 };
+    struct Cmd c;
+    memset(&c, 0, sizeof c);
+    c.cdb = cdb;
+    c.cdblen = 6;
+    c.in = 1;
+    c.data = mc->sense;
+    c.len = sizeof mc->sense;
+    c.sync_period = u->sync_period;
+    c.sync_offset = u->sync_offset;
     memset(mc->sense, 0, sizeof mc->sense);
     if (esp_exec(mc, u->target, u->lun, &c) || c.status)
         return -1;
@@ -106,9 +114,17 @@ static LONG scsi(struct MC *mc, struct MCUnit *u, UBYTE *cdb, UWORD cdblen, void
     int t;
     LONG err = 0;
     for (t = 0; t < TRIES; t++) {
-        struct Cmd c = { cdb, cdblen, in, 0, data, len, 0, 0, 0 };
+        struct Cmd c;
+        memset(&c, 0, sizeof c);
+        c.cdb = cdb;
+        c.cdblen = cdblen;
+        c.in = in;
+        c.data = data;
+        c.len = len;
         if (in && len >= MC_EXT_READ_MIN)
             c.mode = MCMODE_EXT24;
+        c.sync_period = u->sync_period;
+        c.sync_offset = u->sync_offset;
         err = esp_exec(mc, u->target, u->lun, &c);
         if (actual)
             *actual = c.actual;
@@ -278,6 +294,8 @@ static void scsicmd(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     c.data = (UBYTE *)sc->scsi_Data;
     c.len = sc->scsi_Length;
     c.mode = c.in && c.len >= MC_EXT_READ_MIN ? MCMODE_EXT24 : MCMODE_DMA16;
+    c.sync_period = u->sync_period;
+    c.sync_offset = u->sync_offset;
     sc->scsi_Actual = 0;
     sc->scsi_CmdActual = 0;
     sc->scsi_SenseActual = 0;
@@ -359,6 +377,8 @@ static void diag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     c.data = d->data;
     c.len = d->len;
     c.mode = d->mode;
+    c.sync_period = u->sync_period;
+    c.sync_offset = u->sync_offset;
     c.st = &d->st;
     d->err = esp_exec(mc, u->target, u->lun, &c);
     d->actual = c.actual;
@@ -366,6 +386,24 @@ static void diag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     d->st.stray = mc->stray;
     d->st.sleeps = mc->sleeps - s0;
     ior->io_Actual = sizeof *d;
+}
+
+/* MCCMD_SYNC: MCDiag-only conservative SDTR negotiation. */
+static void syncdiag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
+{
+    struct MCSyncReq *r = ior->io_Data;
+
+    if (ior->io_Length < sizeof *r || r->ask_offset > 15 ||
+        (r->ask_offset && r->ask_period < 25)) {
+        ior->io_Error = IOERR_BADLENGTH;
+        return;
+    }
+    r->err = esp_sync(mc, u->target, u->lun, r);
+    if (!r->err) {
+        u->sync_period = r->chip_period;
+        u->sync_offset = r->offset;
+    }
+    ior->io_Actual = sizeof *r;
 }
 
 #ifdef ROM_BUILD
@@ -415,6 +453,9 @@ static void perform(struct MC *mc, struct IOStdReq *ior)
         break;
     case MCCMD_DIAG:
         diag(mc, u, ior);
+        break;
+    case MCCMD_SYNC:
+        syncdiag(mc, u, ior);
         break;
     case TD_GETGEOMETRY:
         geometry(mc, u, ior);

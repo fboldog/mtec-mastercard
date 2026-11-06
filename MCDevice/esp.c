@@ -169,9 +169,15 @@ void esp_init(struct MC *mc)
    NOT READY after that, which the commands retry. */
 void esp_busreset(struct MC *mc)
 {
+    int k;
     wr(mc, R_CMD, C_BUSRESET);
     mc_delay(mc, 1000);                 /* the chip holds RST for about 25 us */
     esp_init(mc);
+    for (k = 0; k < MAX_TARGET * MAX_LUN; k++)
+        if (mc->units[k]) {
+            mc->units[k]->sync_period = 0;
+            mc->units[k]->sync_offset = 0;
+        }
     mc_delay(mc, 250000);
 }
 
@@ -880,6 +886,122 @@ static LONG data_phase(struct MC *mc, struct Cmd *c)
     return dma_phase(mc, c, st);
 }
 
+static LONG sync_failed(struct MC *mc, struct MCSyncReq *r, UBYTE step, LONG err)
+{
+    r->step = step;
+    r->stat = mc->istat;
+    r->intr = mc->iintr;
+    r->seq = mc->iseq;
+    r->err = err;
+    esp_busreset(mc);
+    return err;
+}
+
+/* Negotiate one conservative SDTR, followed by TEST UNIT READY. This is used
+   only by MCDiag. A zero requested offset resets the bus and returns every
+   target to asynchronous operation. */
+LONG esp_sync(struct MC *mc, UBYTE target, UBYTE lun, struct MCSyncReq *r)
+{
+    UBYTE msg[8], n = 0, k, status, clocks = 0;
+    LONG err;
+
+    r->period = r->offset = r->chip_period = r->step = 0;
+    r->stat = r->intr = r->seq = 0;
+    r->err = 0;
+    if (!r->ask_offset) {
+        esp_busreset(mc);
+        return 0;
+    }
+    mc->ipending = 0;
+    wr(mc, R_SYNCPER, 0);
+    wr(mc, R_SYNCOFF, 0);
+    wr(mc, R_CMD, C_FLUSH);
+    wr(mc, R_DESTID, target);
+    wr(mc, R_FIFO, 0x80 | lun);         /* IDENTIFY, no disconnection */
+    wr(mc, R_CMD, C_SELATNS);
+    if (!wait_int(mc, 2))
+        return sync_failed(mc, r, 1, HFERR_SelTimeout);
+    if ((err = chip_error(mc->istat)) != 0 || (mc->iintr & IN_DISC))
+        return sync_failed(mc, r, 2, err ? err : HFERR_SelTimeout);
+    if ((mc->istat & ST_PHASE) != PH_MSGOUT)
+        return sync_failed(mc, r, 3, HFERR_Phase);
+
+    wr(mc, R_CMD, C_FLUSH);
+    wr(mc, R_FIFO, 0x01);               /* EXTENDED MESSAGE, SDTR */
+    wr(mc, R_FIFO, 0x03);
+    wr(mc, R_FIFO, 0x01);
+    wr(mc, R_FIFO, r->ask_period);
+    wr(mc, R_FIFO, r->ask_offset);
+    wr(mc, R_CMD, C_TI);
+    if (!wait_int(mc, 5))
+        return sync_failed(mc, r, 4, HFERR_Phase);
+    if ((err = chip_error(mc->istat)) != 0 || (mc->iintr & IN_DISC))
+        return sync_failed(mc, r, 5, err ? err : HFERR_Phase);
+
+    while ((mc->istat & ST_PHASE) == PH_MSGIN && n < sizeof msg) {
+        wr(mc, R_CMD, C_FLUSH);
+        wr(mc, R_CMD, C_TI);
+        if (!wait_int(mc, 5))
+            return sync_failed(mc, r, 6, HFERR_Phase);
+        if ((err = chip_error(mc->istat)) != 0 || (mc->iintr & IN_DISC))
+            return sync_failed(mc, r, 7, err ? err : HFERR_Phase);
+        msg[n++] = rd(mc, R_FIFO);
+        wr(mc, R_CMD, C_MSGACC);
+        if (!wait_int(mc, 5))
+            return sync_failed(mc, r, 8, HFERR_Phase);
+        if ((err = chip_error(mc->istat)) != 0 || (mc->iintr & IN_DISC))
+            return sync_failed(mc, r, 9, err ? err : HFERR_Phase);
+    }
+    if ((mc->istat & ST_PHASE) == PH_MSGIN)
+        return sync_failed(mc, r, 10, HFERR_Phase);
+    if (n == 5 && msg[0] == 1 && msg[1] == 3 && msg[2] == 1) {
+        r->period = msg[3];
+        r->offset = msg[4];
+        if (!r->period || r->period < r->ask_period || r->offset > r->ask_offset || r->offset > 15)
+            return sync_failed(mc, r, 11, HFERR_Phase);
+        if (r->offset) {
+            clocks = (r->period * 4 + 24) / 25; /* 40 MHz CF94 clock */
+            if (clocks < 4)
+                clocks = 4;
+            r->chip_period = clocks;
+        }
+    } else if (!(n == 1 && msg[0] == 0x07)) { /* MESSAGE REJECT means async */
+        return sync_failed(mc, r, 12, HFERR_Phase);
+    }
+    if ((mc->istat & ST_PHASE) != PH_CMD)
+        return sync_failed(mc, r, 13, HFERR_Phase);
+
+    wr(mc, R_SYNCPER, r->chip_period);
+    wr(mc, R_SYNCOFF, r->offset);
+    wr(mc, R_CMD, C_FLUSH);
+    for (k = 0; k < 6; k++)
+        wr(mc, R_FIFO, 0);              /* TEST UNIT READY */
+    wr(mc, R_CMD, C_TI);
+    if (!wait_int(mc, 5))
+        return sync_failed(mc, r, 14, HFERR_Phase);
+    if ((err = chip_error(mc->istat)) != 0 || (mc->iintr & IN_DISC) ||
+        (mc->istat & ST_PHASE) != PH_STATUS)
+        return sync_failed(mc, r, 15, err ? err : HFERR_Phase);
+    wr(mc, R_CMD, C_ICCS);
+    if (!wait_int(mc, 5))
+        return sync_failed(mc, r, 16, HFERR_Phase);
+    if ((err = chip_error(mc->istat)) != 0)
+        return sync_failed(mc, r, 17, err);
+    status = rd(mc, R_FIFO);
+    (void)rd(mc, R_FIFO);
+    wr(mc, R_CMD, C_MSGACC);
+    if (!wait_int(mc, 5))
+        return sync_failed(mc, r, 18, HFERR_Phase);
+    if ((err = chip_error(mc->istat)) != 0 || !(mc->iintr & IN_DISC))
+        return sync_failed(mc, r, 19, err ? err : HFERR_Phase);
+    if (status)
+        return sync_failed(mc, r, 20, HFERR_BadStatus);
+    r->stat = mc->istat;
+    r->intr = mc->iintr;
+    r->seq = mc->iseq;
+    return 0;
+}
+
 LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
 {
     UWORD k;
@@ -898,8 +1020,8 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
         wr(mc, R_CFG2, CFG2_NORMAL | CFG2_ENF);
     wr(mc, R_CMD, C_FLUSH);
     wr(mc, R_DESTID, target);
-    wr(mc, R_SYNCPER, 0);
-    wr(mc, R_SYNCOFF, 0);
+    wr(mc, R_SYNCPER, c->sync_period);
+    wr(mc, R_SYNCOFF, c->sync_offset);
     wr(mc, R_FIFO, 0x80 | lun);         /* IDENTIFY, no disconnection */
     if (manual_cdb) {
         /* IDENTIFY plus a 16-byte CDB cannot fit in the 16-byte FIFO, and
