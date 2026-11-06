@@ -480,6 +480,29 @@ between steps and asks for SDTR factors 50, 43, 37, 31 and 25, corresponding
 to the CF94's supported 5.0, 5.7, 6.6, 8.0 and 10.0 MB/s timings. Each accepted
 rate must pass two individually poisoned 512 KiB ENF reads before proceeding.
 
+The v12 logs are
+[`logs/mcdiag-26-sync-v12-fast.log`](logs/mcdiag-26-sync-v12-fast.log),
+[`logs/mcdiag-26-sync-v12-sync.log`](logs/mcdiag-26-sync-v12-sync.log),
+[`logs/mcdiag-26-sync-v12-write.log`](logs/mcdiag-26-sync-v12-write.log), and
+[`logs/mcdiag-26-sync-v12-read.log`](logs/mcdiag-26-sync-v12-read.log). Clearing
+`FASTSCSI` at 5 MB/s preserved both directions and the restored-block result.
+BlueSCSI accepted every requested factor through 25/10 MB/s, and all ladder
+buffers compared exactly. Normal timing samples nevertheless plateaued around
+4.5-4.7 MiB/s from factor 50 upward; the CPU word mover is already the limit.
+The factor-25 display of 23215 KiB/s is physically impossible for this bus and
+is another short-clock anomaly, not a production result. There is no sustained
+benefit from negotiating above 5 MB/s with the current mover.
+
+V5 provides a bounded next optimization: its one unsafe 16-byte synchronous
+burst matched through byte three and first differed at byte four, exactly the
+negotiated offset. V13 therefore never treats `$C039` as permission for 16
+bytes. It rechecks the flag before each single `move.l`, consumes only four
+bytes, and falls back to `$D039` words whenever that condition is unavailable.
+The new `l` statistic counts these longword moves separately from 16-byte
+bursts (`b`) and word moves (`w`). This tests whether using the proven-good
+first longword reduces CPU-loop overhead while remaining bounded by offset
+four.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

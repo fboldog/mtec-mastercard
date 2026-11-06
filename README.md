@@ -367,7 +367,7 @@ The tests:
   own buffer.
 
 Each line shows what the data port did:
-- bursts, word moves and bytes through the chip FIFO
+- 16-byte bursts, four-byte longword moves, word moves and chip-FIFO bytes
 - how many DMA or PIO commands it took
 - the longest wait
 - the flags and chip registers at the end

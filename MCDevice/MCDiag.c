@@ -9,9 +9,9 @@
  *   DMA16  16 bytes per $C039 flag, words at the end (the driver's normal mode)
  *   DMA8   8 bytes per $C839 flag, words at the end
  *   WORD   one word per $D039 flag
- * Each line shows what the data port did: bursts, word moves, bytes through the
- * chip FIFO, DMA chunks, the longest wait, and the flags and chip registers at
- * the end.
+ * Each line shows what the data port did: bursts, long/word moves, bytes
+ * through the chip FIFO, DMA chunks, the longest wait, and the flags and chip
+ * registers at the end.
  *
  * A speed section times 16 reads of 64 KB per mode and one-block commands,
  * with the longest gap between vertical blank interrupts during the reads.
@@ -281,8 +281,8 @@ static LONG sync_control(UBYTE period, UBYTE offset, struct MCSyncReq *r)
 static void stats(void)
 {
     struct MCStats *s = &dr.st;
-    P(" b%lu w%lu f%lu c%lu q%lu p%lu tc%lx [%02lx %02lx %02lx] st%02lx>%02lx in%02lx sq%02lx ff%02lx d%lu x%lu i%lu z%lu t%luus\n",
-      s->bursts, s->words, s->fifo, s->chunks, s->pads, s->maxpolls, s->tcleft,
+    P(" b%lu l%lu w%lu f%lu c%lu q%lu p%lu tc%lx [%02lx %02lx %02lx] st%02lx>%02lx in%02lx sq%02lx ff%02lx d%lu x%lu i%lu z%lu t%luus\n",
+      s->bursts, s->longs, s->words, s->fifo, s->chunks, s->pads, s->maxpolls, s->tcleft,
       (ULONG)s->dreq16, (ULONG)s->dreq8, (ULONG)s->dreqw,
       (ULONG)s->stat, (ULONG)s->stat_live, (ULONG)s->intr, (ULONG)s->seq,
       (ULONG)s->fflags, s->drained, s->stray, s->irqs, s->sleeps, lastus);

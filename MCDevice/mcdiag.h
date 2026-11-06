@@ -26,6 +26,7 @@
 
 struct MCStats {
     ULONG bursts;           /* 16- or 8-byte moves */
+    ULONG longs;            /* sync: four bytes after each fresh $C039 test */
     ULONG words;            /* word moves */
     ULONG fifo;             /* bytes taken from or left in the chip's FIFO */
     ULONG chunks;           /* DMA or PIO commands issued */

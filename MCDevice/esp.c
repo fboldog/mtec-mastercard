@@ -499,17 +499,18 @@ static ULONG current_count(struct MC *mc, int extended)
    above INT2 (audio, vertical blank, serial) keep running throughout, which
    the polled transfers, done with interrupts off, don't allow. */
 
-/* Moves what the board offers now; returns the bytes moved.  Synchronous
-   transfers must use only the word-ready handshake.  Hardware tests show that
-   $C039 can assert once at phase entry with offset four, but consuming that
-   16-byte window corrupts the stream.  A synchronous target can also have
-   fewer than 16 REQs outstanding, so $D039 may be ready while $C039 can never
-   become ready.  Leaving that word on the board holds INT2 asserted and traps
-   the machine in the level-2 interrupt chain. */
+/* Moves what the board offers now; returns the bytes moved.  A $C039 sample
+   cannot authorize a 16-byte synchronous burst: with offset four, hardware
+   tests found the first longword correct and corruption immediately after it.
+   Recheck $C039 before every single longword, never moving more than the
+   negotiated offset.  Fall back to the word-ready path because a synchronous
+   target may have fewer than four REQs outstanding.  Leaving a ready word on
+   the board holds INT2 asserted and traps the machine in the level-2 chain. */
 static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
 {
     struct Xfer *x = &mc->x;
     volatile UBYTE *f16 = mc->board + MC_DREQ16, *fw = mc->board + MC_DREQW;
+    volatile ULONG *pl = (volatile ULONG *)(mc->board + MC_PORT);
     volatile UWORD *pw = (volatile UWORD *)(mc->board + MC_PORT);
     ULONG start = x->left;
 
@@ -534,7 +535,19 @@ static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
         x->left -= (UBYTE *)f.buf - x->p;
         x->p = (UBYTE *)f.buf;
     }
-    while (x->left && ((*f16 | *fw) & 0x80)) {
+    while (x->left) {
+        if (x->sync >= 4 && x->left >= 4 && (*f16 & 0x80)) {
+            if (x->in)
+                *(ULONG *)x->p = *pl;
+            else
+                *pl = *(ULONG *)x->p;
+            x->p += 4;
+            x->left -= 4;
+            x->st.longs++;
+            continue;
+        }
+        if (!((*f16 | *fw) & 0x80))
+            break;
         if (x->left >= 2) {
             if (x->in)
                 *(UWORD *)x->p = *pw;
@@ -645,7 +658,7 @@ static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     x->in = c->in;
     x->extended = extended;
     x->rom = rom;
-    x->sync = c->sync_offset != 0;
+    x->sync = c->sync_offset;
     x->moved = 0;
     load_count(mc, n, extended);
     mc->ipending = 0;
@@ -664,6 +677,7 @@ static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     mc->ipending = 1;                   /* esp_exec goes on from the latched registers */
     c->actual += x->moved;
     st->bursts += x->st.bursts;
+    st->longs += x->st.longs;
     st->words += x->st.words;
     st->fifo += x->st.fifo;
     st->chunks += x->st.chunks;
