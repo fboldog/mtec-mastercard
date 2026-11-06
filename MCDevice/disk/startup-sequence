@@ -4,9 +4,10 @@
 FailAt 21
 MakeDir RAM:T
 Assign T: RAM:T
-Echo "MasterCard DMA test - reads only, the log goes to DF0:mcdiag.log"
+Echo "MasterCard DMA test - reads only, logging to RAM during MCDiag."
 Echo "Taking over from the M-Tec ROM driver. Don't use the hard disk until you reboot."
-MCDiag TAKEOVER LOG DF0:mcdiag.log
+MCDiag TAKEOVER LOG RAM:mcdiag.log
+Type RAM:mcdiag.log >DF0:mcdiag.log
 Set u `MCDiag FINDUNIT`
 Echo "== devtest on unit $u" >>DF0:mcdiag.log
 devtest -p mastercard.device >>DF0:mcdiag.log

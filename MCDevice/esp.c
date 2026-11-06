@@ -558,7 +558,7 @@ static void irq_finish(struct MC *mc, UBYTE st)
 {
     struct Xfer *x = &mc->x;
     ULONG rest;
-    UBYTE fifo;
+    UBYTE fifo, live;
 
     if (x->in)
         x->st.drained += drain(mc, 4096);
@@ -568,6 +568,11 @@ static void irq_finish(struct MC *mc, UBYTE st)
     fifo = rd(mc, R_FFLAGS) & 0x1F;
     x->st.tcleft = rest;
     x->st.fflags = fifo;
+    /* In synchronous Data-In, FFLAGS was latched when the phase began and is
+       not a live FIFO count.  In particular, do not use it to read the FIFO;
+       synchronous payload must cross the DMA/DACK port. */
+    if (x->sync && x->in)
+        fifo = 0;
     if (!x->extended && !rest && x->n == 0x10000 && !(st & ST_TC))
         rest = x->n;
     x->moved = x->n - rest;
@@ -586,7 +591,16 @@ static void irq_finish(struct MC *mc, UBYTE st)
     x->st.dreq8 = mc->board[MC_DREQ8];
     x->st.dreqw = mc->board[MC_DREQW];
     mc->iintr = rd(mc, R_INTR);
+    live = st;
+    /* The pre-INTR status belongs to the completed transfer.  Reading INTR
+       opens the phase latch when CFG2.ENF is set and, in either mode, a fresh
+       read observes the phase for the target's next REQ.  Sync Data-In needs
+       that next phase rather than the terminating Data-In sample. */
+    if (x->sync)
+        live = rd(mc, R_STAT);
+    mc->istat = live;
     x->st.stat = st;
+    x->st.stat_live = live;
     x->st.intr = mc->iintr;
     x->st.seq = mc->iseq;
     x->active = 0;
@@ -628,6 +642,7 @@ static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     x->in = c->in;
     x->extended = extended;
     x->rom = rom;
+    x->sync = c->sync_offset != 0;
     x->moved = 0;
     load_count(mc, n, extended);
     mc->ipending = 0;
@@ -657,6 +672,7 @@ static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     st->dreqw = x->st.dreqw;
     st->fflags = x->st.fflags;
     st->stat = x->st.stat;
+    st->stat_live = x->st.stat_live;
     st->intr = x->st.intr;
     st->seq = x->st.seq;
     return chip_error(x->st.stat);
@@ -765,6 +781,7 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
            which nothing would clear once interrupts are on again, so the
            chip is reset first; the caller resets the bus. */
         st->stat = rd(mc, R_STAT);
+        st->stat_live = st->stat;
         st->fflags = rd(mc, R_FFLAGS);
         wr(mc, R_CMD, C_RESET);
         wr(mc, R_CMD, C_NOP);
@@ -795,6 +812,7 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
         /* What the chip moved on the bus: n minus the transfer counter. */
         ULONG rest = current_count(mc, extended);
         UBYTE fifo = rd(mc, R_FFLAGS) & 0x1F;
+        UBYTE live_fifo = c->sync_offset && in ? 0 : fifo;
         ULONG moved;
         st->fflags = fifo;
         st->tcleft = rest;
@@ -805,19 +823,22 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
         moved = n - rest;
         if (in) {
             /* A last odd byte stays in the chip's FIFO. */
-            while (fifo-- && p < c->data + c->actual + moved) {
+            while (live_fifo-- && p < c->data + c->actual + moved) {
                 *p++ = rd(mc, R_FIFO);
                 st->fifo++;
             }
-        } else if (fifo) {
-            moved -= fifo;              /* sent to the FIFO, not taken by the target */
-            st->fifo += fifo;
+        } else if (live_fifo) {
+            moved -= live_fifo;         /* sent to the FIFO, not taken by the target */
+            st->fifo += live_fifo;
             wr(mc, R_CMD, C_FLUSH);
         }
         c->actual += moved;
     }
     mc->iintr = rd(mc, R_INTR);
+    if (c->sync_offset)
+        mc->istat = rd(mc, R_STAT);      /* INTR reopened the S2FE phase latch */
     st->stat = st_;
+    st->stat_live = mc->istat;
     st->intr = mc->iintr;
     st->seq = mc->iseq;
     mc->ipending = 1;
@@ -860,6 +881,7 @@ static LONG pio_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
             st->fifo += k;
         }
         st->stat = mc->istat;
+        st->stat_live = mc->istat;
         st->intr = mc->iintr;
         st->seq = mc->iseq;
         if (mc->iintr & IN_DISC)

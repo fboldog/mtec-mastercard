@@ -271,24 +271,26 @@ static LONG sync_control(UBYTE period, UBYTE offset, struct MCSyncReq *r)
 static void stats(void)
 {
     struct MCStats *s = &dr.st;
-    P(" b%lu w%lu f%lu c%lu p%lu tc%lx [%02lx %02lx %02lx] st%02lx in%02lx sq%02lx ff%02lx d%lu x%lu i%lu z%lu t%luus\n",
+    P(" b%lu w%lu f%lu c%lu p%lu tc%lx [%02lx %02lx %02lx] st%02lx>%02lx in%02lx sq%02lx ff%02lx d%lu x%lu i%lu z%lu t%luus\n",
       s->bursts, s->words, s->fifo, s->chunks, s->maxpolls, s->tcleft,
       (ULONG)s->dreq16, (ULONG)s->dreq8, (ULONG)s->dreqw,
-      (ULONG)s->stat, (ULONG)s->intr, (ULONG)s->seq, (ULONG)s->fflags, s->drained, s->stray, s->irqs, s->sleeps, lastus);
+      (ULONG)s->stat, (ULONG)s->stat_live, (ULONG)s->intr, (ULONG)s->seq,
+      (ULONG)s->fflags, s->drained, s->stray, s->irqs, s->sleeps, lastus);
 }
 
 /* The normal mode (DMA16) into ref, then the others into got, compared with
    ref. align puts the data at got+align, with guard bytes around it. */
 static const UBYTE order[MCMODES_STD] = { MCMODE_DMA16, MCMODE_DMA8, MCMODE_WORD, MCMODE_PIO };
 
-static void test(const char *name, const UBYTE *cdb, UWORD cdblen, ULONG len, ULONG align)
+static void test(const char *name, const UBYTE *cdb, UWORD cdblen, ULONG len,
+                 ULONG align, ULONG nmodes)
 {
     LONG e;
     ULONG want = 0, k, i;
 
     P("-- %s\n", (ULONG)name);         /* flushed: shows where a hang happened */
 
-    for (k = 0; k < MCMODES_STD; k++) {
+    for (k = 0; k < nmodes; k++) {
         UBYTE m = order[k];
         UBYTE *g = k ? got + align : ref;
         if ((m == MCMODE_PIO && len > PIO_MAX) || skipmode[m])
@@ -349,7 +351,7 @@ static void read_test(const char *name, ULONG lba, UWORD n, ULONG align)
     put32(cdb + 2, lba);
     cdb[7] = n >> 8;
     cdb[8] = n;
-    test(name, cdb, 10, n * bsize, align);
+    test(name, cdb, 10, n * bsize, align, MCMODES_STD);
 }
 
 /* Writes len bytes of a known pattern with mode wm and reads them back with
@@ -834,11 +836,13 @@ static void unit_tests(ULONG unit, int write, ULONG wlba, int sync)
         v[8] = p[16] = r[4] = 0;
         P("\n== Unit %lu: type %lu  %s %s %s\n", unit, (ULONG)devtype, (ULONG)v, (ULONG)p, (ULONG)r);
     }
-    test("INQUIRY 36", inq36, 6, 36, 0);
-    test("INQUIRY 37", inq37, 6, 37, 0);
-    test("INQUIRY 255", inq255, 6, 255, 0);
-    test("REQUEST SENSE 18", sense18, 6, 18, 0);
-    test("MODE SENSE 255", msense, 6, 255, 0);
+    test("INQUIRY 36", inq36, 6, 36, 0, MCMODES_STD);
+    test("INQUIRY 37", inq37, 6, 37, 0, MCMODES_STD);
+    test("INQUIRY 255", inq255, 6, 255, 0, MCMODES_STD);
+    /* REQUEST SENSE consumes and clears the pending sense data.  Reissuing it
+       in other transfer modes does not return a stable comparison payload. */
+    test("REQUEST SENSE 18", sense18, 6, 18, 0, 1);
+    test("MODE SENSE 255", msense, 6, 255, 0, MCMODES_STD);
     bsize = 0;
     blocks = 0;
     {

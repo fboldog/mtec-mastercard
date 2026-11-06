@@ -276,7 +276,18 @@ burst, 496 of 512 bytes crossed the CPU port as individual words. The normal
 asynchronous path moves all 512 bytes as 32 bounded 16-byte bursts. Larger sync
 reads would therefore converge on the measured slow WORD path rather than the
 DMA16 result. Sync remains useful as a controller diagnostic, but is not a
-production optimization and no further risky media test is justified for
+production optimization.
+
+The local NCR 53CF94/96-2 manual identifies the likely phase-tail bug. A DMA
+Transfer Information command completes only after its counter is zero, its FIFO
+is empty, and the target asserts REQ for the next byte. The pre-Interrupt Status
+sample describes the command which just completed; after Interrupt is read, a
+fresh Status sample observes the next live phase (and also reopens the explicit
+phase latch when `CFG2.ENF` is enabled). The v2 IRQ path reused the pre-Interrupt
+Data-In sample and mistook the following Status phase for excess input. The next
+build preserves both values for logging, uses the fresh phase after Interrupt,
+and does not treat the phase-entry FIFO-flags latch as a current byte count. A
+small-read v3 run is justified to validate controller correctness, not
 performance.
 
 The sync log's three pre-test failures were unrelated: REQUEST SENSE returned

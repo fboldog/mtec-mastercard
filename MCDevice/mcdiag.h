@@ -33,7 +33,7 @@ struct MCStats {
     ULONG tcleft;           /* transfer counter at the end of the last chunk */
     UBYTE dreq16, dreq8, dreqw;     /* the flags after the last chunk */
     UBYTE fflags, stat, intr, seq;  /* chip registers after the last chunk */
-    UBYTE pad;
+    UBYTE stat_live;        /* status after reading INTR reopens the phase latch */
     ULONG drained;          /* words read after the chip finished */
     ULONG stray;            /* board requests the interrupt server cleared, so far */
     ULONG irqs;             /* IRQXFER: server entries during the data phase */
