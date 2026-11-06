@@ -426,6 +426,24 @@ the captured 512 KiB reference where the transfer size permits, and prints all
 four command times. This separates stale/short-transfer acceptance from an
 EClock measurement fault.
 
+The v9 logs are
+[`logs/mcdiag-23-sync-v9-sync.log`](logs/mcdiag-23-sync-v9-sync.log) and
+[`logs/mcdiag-23-sync-v9-read.log`](logs/mcdiag-23-sync-v9-read.log). Every
+individually poisoned command compared exactly, including alternating halves
+of the 512 KiB reference during the 256 KiB tests. The run again completed at
+95/0/1 with `b0 q0`; the ordinary baseline was 84/0/1 and
+5970/5601/4590 KiB/s. This rules out a prior correct repetition merely hiding
+a later false completion in the destination buffer.
+
+The implausible readings persisted and are now visible individually. The
+256 KiB 24-bit sequence was `[102417 9039 102455 8222]` us and the 512 KiB
+sequence was `[112851 17503 109898 109638]` us. Even the shortest values still
+passed immediate full-buffer and guard-byte validation. V10 records an
+independent AmigaDOS `DateStamp()` interval around each command alongside the
+EClock value. At 50 Hz this clock is coarse, but a legitimate 512 KiB transfer
+at the negotiated 5 MB/s must span at least about five ticks. It does not
+modify the driver or the transfer loop.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

@@ -231,6 +231,15 @@ static ULONG ticks_us(ULONG t)
     return efreq ? t / (efreq / 1000) * 1000 + t % (efreq / 1000) * 1000 / (efreq / 1000) : 0;
 }
 
+/* Independent, coarse wall clock for checking implausible EClock samples.
+   AmigaDOS DateStamp ticks are 1/50 second. */
+static ULONG wall50(void)
+{
+    struct DateStamp ds;
+    DateStamp(&ds);
+    return ds.ds_Days * 72000UL + ds.ds_Minute * 3000UL + ds.ds_Tick;
+}
+
 static LONG run(UBYTE mode, const UBYTE *cdb, UWORD cdblen, UBYTE in, UBYTE *data, ULONG len)
 {
     UWORD k;
@@ -748,7 +757,7 @@ static void sync_tests(void)
     };
     UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     struct MCSyncReq sr;
-    ULONG k, i, j, m, nmodes, len, nb, bad, sumus, off, us[4];
+    ULONG k, i, j, m, nmodes, len, nb, bad, sumus, off, w0, us[4], wall[4];
     LONG e;
 
     P("\n== SYNC diagnostic: read-only, ask 5 MB/s offset 4 ==\n");
@@ -835,7 +844,9 @@ static void sync_tests(void)
                 off = (j % (0x80000 / len)) * len;
                 put32(cdb + 2, off / bsize);
                 memset(got, 0x5A, len + 16);
+                w0 = wall50();
                 e = run(mode, cdb, 10, 1, got, len);
+                wall[j] = wall50() - w0;
                 us[j] = lastus;
                 sumus += us[j];
                 if (e || dr.status || dr.actual != len)
@@ -860,10 +871,11 @@ static void sync_tests(void)
                 sync_diff_bytes(ref + off);
             } else {
                 oks++;
-                P("SYNC%s %7lu B x4 same %lu KB/s [%lu %lu %lu %lu] us",
+                P("SYNC%s %7lu B x4 same %lu KB/s [%lu %lu %lu %lu] us [%lu %lu %lu %lu] t50",
                   (ULONG)counter, len,
                   sumus ? (len >> 8) * 1000000UL / sumus : 0,
-                  us[0], us[1], us[2], us[3]);
+                  us[0], us[1], us[2], us[3],
+                  wall[0], wall[1], wall[2], wall[3]);
             }
             stats();
             if (e || dr.status || dr.actual != len || bad)
