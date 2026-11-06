@@ -20,7 +20,7 @@ as a comparison.
 |---|---|---|
 | CF94 error handling | Illegal-operation and parity status bits were recorded but ignored. Parity reporting was disabled. This made sync or aggressive DMA experiments unsafe. | Parity reporting and abort-on-parity are enabled; parity returns `HFERR_Parity`, illegal operation returns `HFERR_DMA`, and the bus is reset. Hardware testing exposed and localized the pre-existing 16-byte-CDB FIFO overflow. |
 | Short interrupt poll | `FAST_POLLS=4000` represented about 1 ms at 50 MHz, but was machine-specific. | It is now `80 * MC_CPU_MHZ`, with a 42 MHz default (3360 polls) and build-time overrides. |
-| DMA transfer count | The normal path uses 16 bits and restarts the data phase every 64 KiB. AMD documents a 24-bit counter behind `CFG2.ENF`, loaded after DMA NOP. | Private MCDiag mode `EXT24`, capped at 512 KiB. Two matched-size runs show a small, variable benefit averaging about 2%. It remains diagnostic pending a completely regression-free run and is not selected automatically. |
+| DMA transfer count | The normal path uses 16 bits and restarts the data phase every 64 KiB. The NCR 53CF94/96-2 manual documents a 24-bit counter behind `CFG2.ENF`, loaded after DMA NOP. | Private MCDiag mode `EXT24`, capped at 512 KiB. Two matched-size runs show a small, variable benefit averaging about 2%. It remains diagnostic pending a completely regression-free run and is not selected automatically. |
 | DMA16 | The `$C039` path is correct and fastest among the guaranteed board modes. | Production default. |
 | DMA32 | Skipping every second `$C039` check was about 8% faster in MCDiag, but the flag only guarantees 16 bytes. | Diagnostic experiment only; do not auto-select. |
 | Original-ROM loop | M-Tec omits MCDevice's software burst bound and trusts the CF94 counter. This removes `subq`/`beq` from each 16 bytes but a stuck DREQ could overwrite memory. | Rejected for production. In the fair IRQ comparison it measured 3844 KiB/s against DMA16's 3841 KiB/s: no useful gain for losing the software bound. |
@@ -89,11 +89,19 @@ M-Tec: no software burst counter at all. It is not a candidate for the default
 until prolonged tests show a meaningful benefit and its reduced fault
 containment is accepted explicitly.
 
-`EXT24` is based on AMD's
-[Am53CF94/Am53CF96 datasheet](https://www.amd.com/content/dam/amd/en/documents/archived-tech-docs/datasheets/17348.pdf):
+`EXT24` is based primarily on NCR's
+[53CF94/96-2 Fast SCSI Controller data manual](https://www.bitsavers.org/components/ncr_symbios/scsi/53CF94/53CF94_96-2_Fast_SCSI_Controller_Data_Manual_Apr1993.pdf):
 set `CFG2.ENF`, issue DMA NOP, then load registers `$00`, `$01` and `$0E`.
-MCDevice clears ENF after the phase so the normal zero-count value continues to
-mean 64 KiB rather than the extended 16 MiB maximum.
+MCDevice clears ENF after the complete experimental command so the normal
+zero-count value continues to mean 64 KiB rather than the extended 16 MiB
+maximum.
+
+AMD's
+[Am53CF94/Am53CF96 datasheet](https://www.amd.com/content/dam/amd/en/documents/archived-tech-docs/datasheets/17348.pdf)
+is a useful cross-check because it implements the same register and command
+model, including ENF, the 24-bit counter and Select with ATN and Stop. It is not
+treated as proof that the chips are identical: AMD explicitly documents
+vendor-specific differences, including Configuration Register 4 bit 0.
 
 ## First hardware experiment run
 

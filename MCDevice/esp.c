@@ -463,7 +463,7 @@ __asm(
 "  rts\n"
 );
 
-/* The Am53CF94 requires DMA NOP before loading the three-byte counter.
+/* The NCR 53CF94-2 requires DMA NOP before loading the three-byte counter.
    esp_exec keeps ENF set for the complete experimental command so ordinary
    commands retain their original zero-means-64-KiB behavior. */
 static void load_count(struct MC *mc, ULONG n, int extended)
