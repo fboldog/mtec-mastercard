@@ -350,14 +350,33 @@ Transfer Pad before returning `HFERR_DMA` (`b1 w248 q1 tcFFF8`). Together with
 v4's first mismatch at the negotiated offset, this isolates the fault to the
 board's 16-byte-ready/burst semantics during synchronous transfers. The IRQ
 mover now suppresses that path whenever the command has a non-zero synchronous
-offset and services the complete phase using `$D039` word-ready interrupts.
-Asynchronous commands retain their existing fast 16-byte path.
+offset. It still accepts either `$C039` or `$D039` before moving one word, as
+the existing tail path did; it does not consume 16 bytes from one `$C039`
+sample. Asynchronous commands retain their existing fast 16-byte path.
 
 The conservative path is intended to establish a correct interrupt-driven
 synchronous baseline, not yet a speed improvement. Based on the asynchronous
 WORD result, long transfers are likely to remain around 0.6 MiB/s until a safe
 multi-word synchronous handshake is found. Production commands also remain
 asynchronous; synchronization is still enabled only by the diagnostic command.
+
+The v6 logs are
+[`logs/mcdiag-20-sync-v6-sync.log`](logs/mcdiag-20-sync-v6-sync.log) and
+[`logs/mcdiag-20-sync-v6-read.log`](logs/mcdiag-20-sync-v6-read.log). The normal
+run remained clean at 5984/5613/4702 KiB/s. Every synchronous read from 512
+bytes through 512 KiB was byte-exact, every command used only word accesses
+(`b0`), no Transfer Pad was needed (`q0`), and the diagnostic completed at
+90/0/1 before its deliberate asynchronous-reset restore. This establishes a
+correct interrupt-driven synchronous baseline.
+
+The timing exposed a potentially important distinction. Transfers split into
+ordinary 16-bit-count chunks reached about 0.53-0.66 MiB/s, but the single 512
+KiB ENF/24-bit phase reached 4589 KiB/s and completed its last command in
+111351 us. Both paths moved one word per ready test and compared exactly. The
+v7 diagnostic therefore runs matched 16-bit and 24-bit-count transfers at 64,
+128, 256 and 512 KiB. It also fixes the sub-KiB throughput calculation; the
+very large v6 VBlank-gap values are instrumentation anomalies and not used as
+transfer timings.
 
 ### Startup logging stall
 

@@ -742,12 +742,13 @@ static void speed_tests(void)
 static void sync_tests(void)
 {
     /* Start small so a data-port/IRQ incompatibility is localized before the
-       throughput runs.  The first two sizes also reveal whether sync has to
-       fall back from 16-byte batches to the board's word-ready handshake. */
-    static const ULONG sizes[] = { 0x200, 0x1000, 0x10000, 0x20000, 0x80000 };
+       throughput runs. */
+    static const ULONG sizes[] = {
+        0x200, 0x1000, 0x10000, 0x20000, 0x40000, 0x80000
+    };
     UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     struct MCSyncReq sr;
-    ULONG k, i, j, len, nb, bad, t0, dt, vbmax;
+    ULONG k, i, j, m, nmodes, len, nb, bad, t0, dt, vbmax;
     LONG e;
 
     P("\n== SYNC diagnostic: read-only, ask 5 MB/s offset 4 ==\n");
@@ -782,7 +783,7 @@ static void sync_tests(void)
       sr.period ? 250000UL / sr.period : 0);
 
     /* Offset four cannot guarantee the board's 16-byte-ready condition. Test
-       the word-ready handshake alone before allowing any burst-mode probe. */
+       the strict word-ready handshake before the IRQ word-at-a-time path. */
     len = 0x200;
     nb = len / bsize;
     cdb[7] = nb >> 8;
@@ -813,43 +814,55 @@ static void sync_tests(void)
     if (e || dr.status || dr.actual != len || bad)
         goto restore_sync;
 
+    /* Compare the ordinary 16-bit counter with ENF/24-bit counting at every
+       large size.  V6 made the 512 KiB extended phase unexpectedly fast while
+       remaining byte-exact; matched sizes distinguish ENF from transfer size. */
     for (k = 0; k < sizeof sizes / sizeof sizes[0]; k++) {
         len = sizes[k];
         nb = len / bsize;
         cdb[7] = nb >> 8;
         cdb[8] = nb;
-        memset(got, 0x5A, len + 16);
-        vb_start();
-        t0 = now();
-        e = 0;
-        for (j = 0; j < 4; j++)
-            if ((e = run(len == 0x80000 ? MCMODE_EXT24 : MCMODE_DMA16,
-                         cdb, 10, 1, got, len)) || dr.status || dr.actual != len)
-                break;
-        dt = now() - t0;
-        vbmax = vb_stop();
-        bad = 0;
-        if (!e && !dr.status && dr.actual == len) {
-            for (i = 0; i < len && got[i] == ref[i]; i++) ;
-            if (i != len)
-                bad = i + 1;
-            else for (i = len; i < len + 16; i++)
-                if (got[i] != 0x5A) {
-                    bad = i + 1;
+        nmodes = len >= 0x10000 ? 2 : 1;
+        for (m = 0; m < nmodes; m++) {
+            UBYTE mode = m ? MCMODE_EXT24 : MCMODE_DMA16;
+            const char *counter = m ? "24" : "16";
+            memset(got, 0x5A, len + 16);
+            vb_start();
+            t0 = now();
+            e = 0;
+            for (j = 0; j < 4; j++)
+                if ((e = run(mode, cdb, 10, 1, got, len)) ||
+                    dr.status || dr.actual != len)
                     break;
-                }
+            dt = now() - t0;
+            vbmax = vb_stop();
+            bad = 0;
+            if (!e && !dr.status && dr.actual == len) {
+                for (i = 0; i < len && got[i] == ref[i]; i++) ;
+                if (i != len)
+                    bad = i + 1;
+                else for (i = len; i < len + 16; i++)
+                    if (got[i] != 0x5A) {
+                        bad = i + 1;
+                        break;
+                    }
+            }
+            if (e || dr.status || dr.actual != len)
+                P("SYNC%s %7lu B x4 ERR %ld %lu/%lu s%02lx", (ULONG)counter,
+                  len, e, dr.actual, len, (ULONG)dr.status);
+            else if (bad) {
+                P("SYNC%s %7lu B x4 DIFF/OVER @%lx\n", (ULONG)counter,
+                  len, bad - 1);
+                sync_diff_bytes();
+            } else {
+                oks++;
+                P("SYNC%s %7lu B x4 same %lu KB/s, VBlank gap max %lu us",
+                  (ULONG)counter, len, dt ? (len >> 8) * efreq / dt : 0, vbmax);
+            }
+            stats();
+            if (e || dr.status || dr.actual != len || bad)
+                break;
         }
-        if (e || dr.status || dr.actual != len)
-            P("SYNC %7lu B x4 ERR %ld %lu/%lu s%02lx", len, e, dr.actual, len, (ULONG)dr.status);
-        else if (bad) {
-            P("SYNC %7lu B x4 DIFF/OVER @%lx\n", len, bad - 1);
-            sync_diff_bytes();
-        } else {
-            oks++;
-            P("SYNC %7lu B x4 same %lu KB/s, VBlank gap max %lu us", len,
-              dt ? (len >> 10) * 4 * efreq / dt : 0, vbmax);
-        }
-        stats();
         if (e || dr.status || dr.actual != len || bad)
             break;
     }
