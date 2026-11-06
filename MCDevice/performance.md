@@ -543,6 +543,18 @@ counter in both directions. It saves the complete region asynchronously,
 writes and verifies it synchronously, then resets the bus and restores and
 verifies all 64 KiB asynchronously.
 
+The v15 result is
+[`logs/mcdiag-29-sync-v15-write.log`](logs/mcdiag-29-sync-v15-write.log).
+The 64 KiB extended-counter Data-Out and Data-In phases were both byte-exact,
+used one phase with `l4096 w24576`, and required no FIFO or Transfer Pad bytes.
+After the bus returned to asynchronous mode, the complete original 64 KiB
+region was restored and verified. The run finished at 96/0/1. This closes the
+correctness gap left by the earlier one-block write, but it does not yet show
+a write-side speed benefit: the synchronous write took 129.743 ms while its
+readback reported 34.801 ms. V16 therefore expands the same failure-safe test
+to one complete 512 KiB extended-counter phase before production negotiation
+is considered.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

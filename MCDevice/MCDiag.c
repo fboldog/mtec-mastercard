@@ -70,7 +70,7 @@ static ULONG fails, oks, skips;
 static struct MsgPort port;
 static struct IOStdReq io;
 static UBYTE *ref, *got, *save;
-static ULONG workbufsize;
+static ULONG workbufsize, savesize;
 static ULONG bsize, blocks;
 static UBYTE devtype;
 static UBYTE skipmode[MCMODES];
@@ -749,7 +749,7 @@ static void speed_tests(void)
 /* Opt-in sync test. It compares against an async 512 KiB read, starts with the
    conservative 5 MB/s / offset 4 agreement, and always resets the SCSI bus
    back to asynchronous operation before returning. With WRITE it also saves,
-   tests and asynchronously restores a 64 KiB medium region. */
+   tests and asynchronously restores a 512 KiB medium region. */
 static void sync_tests(int write, ULONG wlba)
 {
     /* Start small so a data-port/IRQ incompatibility is localized before the
@@ -768,21 +768,21 @@ static void sync_tests(int write, ULONG wlba)
     LONG e;
 
     P("\n== SYNC diagnostic: ask 5 MB/s offset 4%s ==\n",
-      (ULONG)(write ? ", 64 KiB write/restore" : ", read-only"));
+      (ULONG)(write ? ", 512 KiB write/restore" : ", read-only"));
     if (!efreq || !bsize || workbufsize < 0x80000 + 16) {
         P("SYNC               skipped: EClock, medium or large buffers unavailable\n");
         skips++;
         return;
     }
     if (write) {
-        write_len = 0x10000;
-        if (blocks <= 300 || write_len / bsize > blocks) {
+        write_len = 0x80000;
+        nb = write_len / bsize;
+        if (blocks <= nb + 300) {
             P("SYNC WRITE         skipped: medium is too small for the default scratch block\n");
             skips++;
             return;
         }
-        write_lba = wlba ? wlba : blocks - 300;
-        nb = write_len / bsize;
+        write_lba = wlba ? wlba : blocks - nb - 300;
         if (write_lba > blocks - nb) {
             P("SYNC WRITE         skipped: %lu blocks at LBA %lu exceed the medium\n",
               nb, write_lba);
@@ -940,22 +940,23 @@ static void sync_tests(int write, ULONG wlba)
         wst = dr.status;
         ws = dr.st;
         memset(&rs, 0, sizeof rs);
-        memset(ref, 0x5A, write_len + 16);
+        memset(got, 0x5A, write_len + 16);
         if (!e && !wst) {
-            re = run(MCMODE_EXT24, rcdb, 10, 1, ref, write_len);
+            re = run(MCMODE_EXT24, rcdb, 10, 1, got, write_len);
             rus = lastus;
             ract = dr.actual;
             rst = dr.status;
             rs = dr.st;
         }
-        for (i = 0; i < write_len && ref[i] == got[i]; i++) ;
+        for (i = 0; i < write_len &&
+                    got[i] == (UBYTE)(i * 7 + (i >> 8) + 0x53 * 31 + 1); i++) ;
         if (!e && !re && !wst && !rst && wact == write_len && ract == write_len &&
-            i == write_len && ref[write_len] == 0x5A) {
+            i == write_len && got[write_len] == 0x5A) {
             oks++;
-            P("SYNC WRITE 64K    same at LBA %lu\n", write_lba);
+            P("SYNC WRITE 512K   same at LBA %lu\n", write_lba);
         } else {
             fails++;
-            P("SYNC WRITE 64K    FAIL e%ld/%ld w%lu/s%02lx r%lu/s%02lx @%lx\n",
+            P("SYNC WRITE 512K   FAIL e%ld/%ld w%lu/s%02lx r%lu/s%02lx @%lx\n",
               e, re, wact, (ULONG)wst, ract, (ULONG)rst, i);
         }
         P("  write:");
@@ -1245,7 +1246,8 @@ LONG start(void)
         ref = (UBYTE *)AllocMem(workbufsize, MEMF_PUBLIC);
         got = (UBYTE *)AllocMem(workbufsize, MEMF_PUBLIC);
     }
-    save = (UBYTE *)AllocMem(BUFSIZE, MEMF_PUBLIC);
+    savesize = args[2] && args[8] ? workbufsize : BUFSIZE;
+    save = (UBYTE *)AllocMem(savesize, MEMF_PUBLIC);
     if (!ref || !got || !save) {
         P("No memory\n");
         goto done;
@@ -1270,7 +1272,7 @@ LONG start(void)
 done:
     if (ref) FreeMem(ref, workbufsize);
     if (got) FreeMem(got, workbufsize);
-    if (save) FreeMem(save, BUFSIZE);
+    if (save) FreeMem(save, savesize);
     if (TimerBase) CloseDevice((struct IORequest *)&treq);
     if (logfh) Close(logfh);
     if (ra) FreeArgs(ra);
