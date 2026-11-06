@@ -912,6 +912,41 @@ static LONG data_phase(struct MC *mc, struct Cmd *c)
     return dma_phase(mc, c, st);
 }
 
+/* A target may remain in synchronous Data-In after the requested buffer is
+   full. Transfer Pad is the controller-defined recovery: it consumes and
+   discards input internally until the target changes phase, without exposing
+   any additional bytes to the caller's buffer. */
+static LONG pad_phase(struct MC *mc, struct Cmd *c, int extended)
+{
+    struct MCStats *st = c->st;
+    UBYTE latched, live;
+    LONG err;
+
+    load_count(mc, 0x10000, extended);  /* bounded pad; phase change ends it early */
+    mc->ipending = 0;
+    wr(mc, R_CMD, C_DMA | C_PAD);
+    if (!wait_int(mc, 5))
+        return HFERR_Phase;
+    latched = mc->istat;
+    err = chip_error(latched);
+    live = rd(mc, R_STAT);              /* INTR was read by mc_irq */
+    mc->istat = live;
+    if (st) {
+        st->chunks++;
+        st->pads++;
+        st->tcleft = current_count(mc, extended);
+        st->fflags = rd(mc, R_FFLAGS) & 0x1F;
+        st->stat = latched;
+        st->stat_live = live;
+        st->intr = mc->iintr;
+        st->seq = mc->iseq;
+        st->dreq16 = mc->board[MC_DREQ16];
+        st->dreq8 = mc->board[MC_DREQ8];
+        st->dreqw = mc->board[MC_DREQW];
+    }
+    return err ? err : chip_error(live);
+}
+
 static LONG sync_failed(struct MC *mc, struct MCSyncReq *r, UBYTE step, LONG err)
 {
     r->step = step;
@@ -1032,6 +1067,7 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
 {
     UWORD k;
     int phases = 0;
+    int pads = 0;
     int extended = c->mode == MCMODE_EXT24;
     int manual_cdb = c->cdblen > 12;
     LONG err = 0;
@@ -1087,10 +1123,22 @@ LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
         switch (st & ST_PHASE) {
         case PH_DATAOUT:
         case PH_DATAIN:
-            if ((st & ST_PHASE) != (c->in ? PH_DATAIN : PH_DATAOUT) || c->actual >= c->len) {
+            if ((st & ST_PHASE) != (c->in ? PH_DATAIN : PH_DATAOUT)) {
                 err = HFERR_Phase;      /* wrong direction or too much: give up */
                 esp_busreset(mc);
                 return err;
+            }
+            if (c->actual >= c->len) {
+                /* This is the standard 53C9x zero-residual data-phase case.
+                   Keep it diagnostic-only until sync is proven harmless. */
+                if (!c->sync_offset || !c->in || ++pads > 1 ||
+                    (err = pad_phase(mc, c, extended))) {
+                    if (!err)
+                        err = HFERR_Phase;
+                    esp_busreset(mc);
+                    return err;
+                }
+                continue;
             }
             if ((err = data_phase(mc, c))) {
                 esp_busreset(mc);

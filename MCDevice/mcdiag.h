@@ -29,6 +29,7 @@ struct MCStats {
     ULONG words;            /* word moves */
     ULONG fifo;             /* bytes taken from or left in the chip's FIFO */
     ULONG chunks;           /* DMA or PIO commands issued */
+    ULONG pads;             /* synchronous overrun phases discarded by Transfer Pad */
     ULONG maxpolls;         /* longest wait for a flag, in polls */
     ULONG tcleft;           /* transfer counter at the end of the last chunk */
     UBYTE dreq16, dreq8, dreqw;     /* the flags after the last chunk */

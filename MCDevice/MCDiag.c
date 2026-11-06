@@ -271,8 +271,8 @@ static LONG sync_control(UBYTE period, UBYTE offset, struct MCSyncReq *r)
 static void stats(void)
 {
     struct MCStats *s = &dr.st;
-    P(" b%lu w%lu f%lu c%lu p%lu tc%lx [%02lx %02lx %02lx] st%02lx>%02lx in%02lx sq%02lx ff%02lx d%lu x%lu i%lu z%lu t%luus\n",
-      s->bursts, s->words, s->fifo, s->chunks, s->maxpolls, s->tcleft,
+    P(" b%lu w%lu f%lu c%lu q%lu p%lu tc%lx [%02lx %02lx %02lx] st%02lx>%02lx in%02lx sq%02lx ff%02lx d%lu x%lu i%lu z%lu t%luus\n",
+      s->bursts, s->words, s->fifo, s->chunks, s->pads, s->maxpolls, s->tcleft,
       (ULONG)s->dreq16, (ULONG)s->dreq8, (ULONG)s->dreqw,
       (ULONG)s->stat, (ULONG)s->stat_live, (ULONG)s->intr, (ULONG)s->seq,
       (ULONG)s->fflags, s->drained, s->stray, s->irqs, s->sleeps, lastus);

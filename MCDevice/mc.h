@@ -75,6 +75,7 @@ static inline void NewList(struct List *l)
 #define C_TI       0x10
 #define C_ICCS     0x11
 #define C_MSGACC   0x12
+#define C_PAD      0x18
 #define C_SETATN   0x1A
 #define C_SELATN   0x42
 #define C_SELATNS  0x43     /* select with ATN and stop after IDENTIFY */

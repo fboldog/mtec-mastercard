@@ -290,6 +290,26 @@ and does not treat the phase-entry FIFO-flags latch as a current byte count. A
 small-read v3 run is justified to validate controller correctness, not
 performance.
 
+The v3 run is in
+[`logs/mcdiag-17-sync-v3-sync.log`](logs/mcdiag-17-sync-v3-sync.log), with its
+ordinary baseline in
+[`logs/mcdiag-17-sync-v3-read.log`](logs/mcdiag-17-sync-v3-read.log). The
+baseline passed with 84 successes, no failures and one skip; `devtest` measured
+5976/5605/4597 KiB/s. Sync again moved exactly 512 bytes without a lock. The
+new register pair was `st91>11`: reading Interrupt cleared the interrupt bit but
+the live bus phase remained Data-In. This disproves the stale-phase hypothesis.
+
+The generic NetBSD
+[`ncr53c9x` driver](https://github.com/NetBSD/src/blob/trunk/sys/dev/ic/ncr53c9x.c)
+documents and handles this exact state: if its requested data count is already
+zero while the target remains in Data phase, it issues a DMA Transfer Pad
+command. The controller then receives and discards the excess internally until
+the target changes phase. The next diagnostic uses that controller-defined
+recovery only for synchronous Data-In, with a 64 KiB pad bound, five-second
+timeout, and the existing bus-reset failure path. It does not enlarge or write
+past the caller's buffer, and the asynchronous reference comparison still
+validates the original 512 bytes.
+
 The sync log's three pre-test failures were unrelated: REQUEST SENSE returned
 pending sense data once and cleared it, so the three following calls correctly
 returned different bytes. MCDiag now runs this state-consuming command only
