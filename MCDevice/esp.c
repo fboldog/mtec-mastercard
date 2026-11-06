@@ -513,6 +513,7 @@ static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
     volatile ULONG *pl = (volatile ULONG *)(mc->board + MC_PORT);
     volatile UWORD *pw = (volatile UWORD *)(mc->board + MC_PORT);
     ULONG start = x->left;
+    UBYTE ready16;
 
     if (!x->sync && x->left >= 16 && (*f16 & 0x80)) {
         struct Fast f;
@@ -536,7 +537,8 @@ static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
         x->p = (UBYTE *)f.buf;
     }
     while (x->left) {
-        if (x->sync >= 4 && x->left >= 4 && (*f16 & 0x80)) {
+        ready16 = *f16;
+        if (x->sync >= 4 && x->left >= 4 && (ready16 & 0x80)) {
             if (x->in)
                 *(ULONG *)x->p = *pl;
             else
@@ -546,7 +548,7 @@ static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
             x->st.longs++;
             continue;
         }
-        if (!((*f16 | *fw) & 0x80))
+        if (!((ready16 | *fw) & 0x80))
             break;
         if (x->left >= 2) {
             if (x->in)

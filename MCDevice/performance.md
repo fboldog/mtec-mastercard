@@ -503,6 +503,23 @@ bursts (`b`) and word moves (`w`). This tests whether using the proven-good
 first longword reduces CPU-loop overhead while remaining bounded by offset
 four.
 
+The v13 logs are
+[`logs/mcdiag-27-sync-v13-sync.log`](logs/mcdiag-27-sync-v13-sync.log),
+[`logs/mcdiag-27-sync-v13-write.log`](logs/mcdiag-27-sync-v13-write.log), and
+[`logs/mcdiag-27-sync-v13-read.log`](logs/mcdiag-27-sync-v13-read.log). Both
+directions remained byte-exact, the original block was restored, and the runs
+finished at 95/0/1 and 96/0/1. A 512 KiB phase used 32768 longword moves for
+one quarter of the payload and 196608 words for the remaining three quarters.
+Stable read samples fell from roughly 4.6 MiB/s to 4.39 MiB/s, so the first
+implementation is correct but slower.
+
+The slowdown has a direct software cause: the longword test read `$C039`, then
+the fallback expression read `$C039` a second time before `$D039`. V14 retains
+the bounded longword operation but reuses the first `$C039` sample. Its word
+fallback now performs the same number of flag reads as v12. The iterative ADF
+also uses `MCDiag TAKEOVER LOADONLY` at startup, installing the replacement
+driver without automatically running the full asynchronous baseline.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

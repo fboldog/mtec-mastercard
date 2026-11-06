@@ -1,7 +1,7 @@
 /* MCDiag - tests how mastercard.device moves data on the real MasterCard.
  *
  *   MCDiag [UNIT n] [TAKEOVER] [WRITE] [LBA n] [LOG file] [FINDUNIT]
- *          [NODMA8] [NOPIO] [SYNC] [FAST]
+ *          [NODMA8] [NOPIO] [SYNC] [FAST] [LOADONLY]
  *
  * Every test runs a SCSI command through the chip's FIFO without DMA first
  * (PIO, the reference), then with each of the board's data port modes, and
@@ -1169,7 +1169,7 @@ static void unit_tests(ULONG unit, int write, ULONG wlba, int sync, int fast)
 LONG start(void)
 {
     LONG rc = RETURN_FAIL;
-    LONG args[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    LONG args[11] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     struct RDArgs *ra;
     ULONG unit, first, last;
 
@@ -1177,7 +1177,7 @@ LONG start(void)
     DOSBase = (struct DosLibrary *)OpenLibrary((STRPTR)"dos.library", 37);
     if (!DOSBase)
         return rc;
-    ra = (struct RDArgs *)ReadArgs((STRPTR)"UNIT/N,TAKEOVER/S,WRITE/S,LBA/N,LOG/K,FINDUNIT/S,NODMA8/S,NOPIO/S,SYNC/S,FAST/S", args, 0);
+    ra = (struct RDArgs *)ReadArgs((STRPTR)"UNIT/N,TAKEOVER/S,WRITE/S,LBA/N,LOG/K,FINDUNIT/S,NODMA8/S,NOPIO/S,SYNC/S,FAST/S,LOADONLY/S", args, 0);
     if (!ra) {
         PrintFault(IoErr(), (STRPTR)"MCDiag");
         goto done;
@@ -1211,6 +1211,18 @@ LONG start(void)
     P("MCDiag 0.1 - data port tests for mastercard.device\n");
     if (args[1] && !takeover())
         goto done;
+    if (args[10]) {                    /* takeover/load for a quick test disk */
+        for (unit = 0; unit < 7; unit++)
+            if (open_unit(unit)) {
+                CloseDevice((struct IORequest *)&io);
+                P("Replacement driver loaded; unit %lu is ready\n", unit);
+                rc = RETURN_OK;
+                goto done;
+            }
+        P("Replacement driver loaded, but no disk unit responded\n");
+        rc = RETURN_WARN;
+        goto done;
+    }
     treq.tr_node.io_Message.mn_ReplyPort = &port;
     treq.tr_node.io_Message.mn_Length = sizeof treq;
     if (!OpenDevice((STRPTR)"timer.device", UNIT_ECLOCK, (struct IORequest *)&treq, 0)) {
