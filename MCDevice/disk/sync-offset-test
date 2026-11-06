@@ -1,0 +1,7 @@
+; Read-only synchronous-offset ladder at factor 50. Each offset is tested with
+; two poisoned/verified 512 KiB reads, then the bus is reset to async.
+FailAt 21
+Echo "Experimental sync offset ladder: 4, 8, 12 and 15; read-only."
+Set u `MCDiag FINDUNIT`
+MCDiag UNIT $u SYNC OFFSETS LOG DF0:mcsync-offset.log
+Echo "Done. The result is DF0:mcsync-offset.log."

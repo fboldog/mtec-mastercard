@@ -2,7 +2,7 @@
  *
  *   MCDiag [UNIT n] [TAKEOVER] [WRITE] [LBA n] [LOG file] [FINDUNIT]
  *          [NODMA8] [NOPIO] [SYNC] [FAST] [LOADONLY]
- *          [ENABLESYNC] [DISABLESYNC]
+ *          [ENABLESYNC] [DISABLESYNC] [OFFSETS]
  *
  * Every test runs a SCSI command through the chip's FIFO without DMA first
  * (PIO, the reference), then with each of the board's data port modes, and
@@ -1024,21 +1024,26 @@ restore_sync:
     }
 }
 
-/* Read-only negotiated-rate ladder. Each step starts from a bus reset, asks
-   for the next CF94-supported period, validates two 512 KiB ENF reads, and
-   resets back to asynchronous operation before proceeding. */
-static void sync_fast_tests(void)
+/* Read-only negotiated rate/offset ladders. Each step starts from a bus reset,
+   validates two 512 KiB ENF reads, and resets back to async before proceeding. */
+static void sync_ladder_tests(int offset_ladder)
 {
     static const UBYTE factors[] = { 50, 43, 37, 31, 25 };
+    static const UBYTE offsets[] = { 4, 8, 12, 15 };
     UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     struct MCSyncReq sr;
-    ULONG k, i, j, nb, bad, sumus, w0, us[2], wall[2];
+    ULONG k, i, j, nb, bad, sumus, w0, us[2], wall[2], nsteps;
     const ULONG len = 0x80000;
+    const char *name = offset_ladder ? "OFFSET" : "FAST";
     LONG e;
 
-    P("\n== SYNC FAST ladder: 5.0, 5.7, 6.6, 8.0, 10.0 MB/s; read-only ==\n");
+    if (offset_ladder)
+        P("\n== SYNC OFFSET ladder: factor 50, offsets 4, 8, 12, 15; read-only ==\n");
+    else
+        P("\n== SYNC FAST ladder: 5.0, 5.7, 6.6, 8.0, 10.0 MB/s; read-only ==\n");
     if (!efreq || !bsize || workbufsize < len + 16) {
-        P("SYNC FAST         skipped: EClock, medium or large buffers unavailable\n");
+        P("SYNC %s       skipped: EClock, medium or large buffers unavailable\n",
+          (ULONG)name);
         skips++;
         return;
     }
@@ -1048,18 +1053,22 @@ static void sync_fast_tests(void)
     memset(ref, 0xA5, len + 16);
     e = run(MCMODE_DMA16, cdb, 10, 1, ref, len);
     if (e || dr.status || dr.actual != len || ref[len] != 0xA5) {
-        P("SYNC FAST ref     ERR %ld %lu/%lu s%02lx", e, dr.actual, len,
+        P("SYNC %s ref   ERR %ld %lu/%lu s%02lx", (ULONG)name, e, dr.actual, len,
           (ULONG)dr.status);
         stats();
         skips++;
         return;
     }
 
-    for (k = 0; k < sizeof factors; k++) {
-        e = sync_control(factors[k], 4, &sr);
+    nsteps = offset_ladder ? sizeof offsets : sizeof factors;
+    for (k = 0; k < nsteps; k++) {
+        UBYTE ask_period = offset_ladder ? 50 : factors[k];
+        UBYTE ask_offset = offset_ladder ? offsets[k] : 4;
+        e = sync_control(ask_period, ask_offset, &sr);
         if (e || !sr.offset) {
-            P("SYNC FAST ask %lu ERR %ld step %lu reply factor %lu offset %lu [%02lx %02lx %02lx]\n",
-              (ULONG)factors[k], e, (ULONG)sr.step, (ULONG)sr.period,
+            P("SYNC %s ask %lu/%lu ERR %ld step %lu reply factor %lu offset %lu [%02lx %02lx %02lx]\n",
+              (ULONG)name, (ULONG)ask_period, (ULONG)ask_offset, e,
+              (ULONG)sr.step, (ULONG)sr.period,
               (ULONG)sr.offset, (ULONG)sr.stat, (ULONG)sr.intr, (ULONG)sr.seq);
             if (e)
                 fails++;
@@ -1068,8 +1077,9 @@ static void sync_fast_tests(void)
             sync_control(0, 0, &sr);
             break;
         }
-        P("SYNC FAST ask %lu reply factor %lu offset %lu, CF94 period %lu (~%lu KB/s bus)\n",
-          (ULONG)factors[k], (ULONG)sr.period, (ULONG)sr.offset,
+        P("SYNC %s ask %lu/%lu reply factor %lu offset %lu, CF94 period %lu (~%lu KB/s bus)\n",
+          (ULONG)name, (ULONG)ask_period, (ULONG)ask_offset,
+          (ULONG)sr.period, (ULONG)sr.offset,
           (ULONG)sr.chip_period, sr.period ? 250000UL / sr.period : 0);
 
         e = 0;
@@ -1097,22 +1107,26 @@ static void sync_fast_tests(void)
         }
         if (e || dr.status || dr.actual != len) {
             fails++;
-            P("SYNC FAST %lu    ERR %ld %lu/%lu s%02lx", (ULONG)factors[k],
+            P("SYNC %s %lu    ERR %ld %lu/%lu s%02lx", (ULONG)name,
+              (ULONG)(offset_ladder ? ask_offset : ask_period),
               e, dr.actual, len, (ULONG)dr.status);
         } else if (bad) {
             fails++;
-            P("SYNC FAST %lu    DIFF/OVER @%lx\n", (ULONG)factors[k], bad - 1);
+            P("SYNC %s %lu    DIFF/OVER @%lx\n", (ULONG)name,
+              (ULONG)(offset_ladder ? ask_offset : ask_period), bad - 1);
             sync_diff_bytes(ref);
         } else {
             oks++;
-            P("SYNC FAST %lu    same %lu KB/s [%lu %lu] us [%lu %lu] t50",
-              (ULONG)factors[k], sumus ? 1024UL * 1000000UL / sumus : 0,
+            P("SYNC %s %lu    same %lu KB/s [%lu %lu] us [%lu %lu] t50",
+              (ULONG)name, (ULONG)(offset_ladder ? ask_offset : ask_period),
+              sumus ? 1024UL * 1000000UL / sumus : 0,
               us[0], us[1], wall[0], wall[1]);
         }
         stats();
         {
             LONG reset = sync_control(0, 0, &sr);
-            P("SYNC FAST async  %s\n", (ULONG)(reset ? "RESET FAILED" : "restore ok"));
+            P("SYNC %s async  %s\n", (ULONG)name,
+              (ULONG)(reset ? "RESET FAILED" : "restore ok"));
             if (reset) {
                 fails++;
                 break;
@@ -1130,7 +1144,7 @@ static int open_unit(ULONG unit)
     return !OpenDevice((STRPTR)DEV_NAME, unit, (struct IORequest *)&io, 0);
 }
 
-static void unit_tests(ULONG unit, int write, ULONG wlba, int sync, int fast)
+static void unit_tests(ULONG unit, int write, ULONG wlba, int sync, int fast, int offsets)
 {
     static const UBYTE inq36[6] = { 0x12, 0, 0, 0, 36, 0 };
     static const UBYTE inq37[6] = { 0x12, 0, 0, 0, 37, 0 };
@@ -1195,7 +1209,9 @@ static void unit_tests(ULONG unit, int write, ULONG wlba, int sync, int fast)
         write_tests(wlba ? wlba : blocks - 300);
     if (sync) {
         if (fast)
-            sync_fast_tests();
+            sync_ladder_tests(0);
+        else if (offsets)
+            sync_ladder_tests(1);
         else
             sync_tests(write, wlba);
     }
@@ -1204,7 +1220,7 @@ static void unit_tests(ULONG unit, int write, ULONG wlba, int sync, int fast)
 LONG start(void)
 {
     LONG rc = RETURN_FAIL;
-    LONG args[13] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    LONG args[14] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     struct RDArgs *ra;
     ULONG unit, first, last;
 
@@ -1212,7 +1228,7 @@ LONG start(void)
     DOSBase = (struct DosLibrary *)OpenLibrary((STRPTR)"dos.library", 37);
     if (!DOSBase)
         return rc;
-    ra = (struct RDArgs *)ReadArgs((STRPTR)"UNIT/N,TAKEOVER/S,WRITE/S,LBA/N,LOG/K,FINDUNIT/S,NODMA8/S,NOPIO/S,SYNC/S,FAST/S,LOADONLY/S,ENABLESYNC/S,DISABLESYNC/S", args, 0);
+    ra = (struct RDArgs *)ReadArgs((STRPTR)"UNIT/N,TAKEOVER/S,WRITE/S,LBA/N,LOG/K,FINDUNIT/S,NODMA8/S,NOPIO/S,SYNC/S,FAST/S,LOADONLY/S,ENABLESYNC/S,DISABLESYNC/S,OFFSETS/S", args, 0);
     if (!ra) {
         PrintFault(IoErr(), (STRPTR)"MCDiag");
         goto done;
@@ -1297,7 +1313,7 @@ LONG start(void)
             driver_sync(args[11] != 0);
         else
             unit_tests(unit, args[2] != 0, args[3] ? *(ULONG *)args[3] : 0,
-                       args[8] != 0, args[9] != 0);
+                       args[8] != 0, args[9] != 0, args[13] != 0);
         CloseDevice((struct IORequest *)&io);
     }
     P("\nRESULT %lu ok, %lu failed, %lu skipped\n", oks, fails, skips);

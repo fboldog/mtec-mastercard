@@ -573,6 +573,23 @@ the proven 24-bit counter from 64 KiB upward; smaller phases retain the proven
 16-bit counter. This isolates the production-path experiment from boot and
 unrelated targets.
 
+The v17 result is
+[`logs/mcdiag-31-sync-v17-driver.log`](logs/mcdiag-31-sync-v17-driver.log).
+Negotiation remained active through ordinary `CMD_READ` and `HD_SCSICMD`
+traffic, every API/capacity check completed, and the final explicit bus reset
+restored asynchronous operation. Normal-driver read rates were 5041, 1431 and
+444 KiB/s for 512, 128 and 32 KiB transfers. The comparable asynchronous
+baseline is roughly 5980, 5600 and 4700 KiB/s. Offset-4 sync is therefore a
+17% regression at 512 KiB and a severe regression at ordinary smaller sizes;
+it must not be enabled automatically.
+
+The remaining bounded optimization is a larger negotiated offset. The IRQ
+mover already rechecks `$C039` before every four-byte move, so an offset of
+eight or more may naturally keep the flag asserted for additional safe
+longwords without restoring the corrupt 16-byte burst. V18 adds a read-only
+factor-50 offset ladder (4, 8, 12 and 15), resetting to async and checking two
+individually poisoned 512 KiB buffers after each step.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately
