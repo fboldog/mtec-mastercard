@@ -29,7 +29,7 @@ as a comparison.
 | Bulk IRQ behavior | A 64 KiB read normally takes two server entries and zero timer sleeps. M-Tec's disassembled handler uses the same four-longword transfer and a similar run of DREQ tests. | `MC_FAST_POLLS` cannot materially accelerate the bulk inner loop. |
 | IRQ duration | Exec recommends deferring lengthy interrupt work, but the board holds INT2 active while DREQ is asserted. Returning without moving the data would immediately retrigger the PORTS interrupt, and the byte-exact original-ROM disassembly uses no mask or acknowledge register. | Keep the IRQ copy. A software interrupt alone does not solve this; a card-local mask would require new hardware evidence. |
 | Disconnect/reselect | IDENTIFY forbids disconnect and the driver executes one request at a time. | Low priority for one solid-state target; potentially important with multiple targets or mechanical disks. |
-| Synchronous SCSI | Production commands remain asynchronous. Previous sync tests used the old driver, offset 15, and showed FIFO/illegal-operation risk with no speed gain. | A read-only MCDiag experiment now negotiates 5 MB/s at offset 4, checks 64/128/512 KiB reads, and resets the bus back to async. Hardware validation pending; never enabled automatically. |
+| Synchronous SCSI | Production commands remain asynchronous. Previous sync tests used the old driver, offset 15, and showed FIFO/illegal-operation risk with no speed gain. | The new driver negotiates 5 MB/s at offset 4, but the first read exposed an IRQ word-ready deadlock. The fallback is fixed and awaiting its second hardware run; sync is never enabled automatically. |
 | Write performance | Correctness and restore tests exist, but comparable write-throughput measurements do not. | Add restored-area write timing before tuning the output loop. |
 
 ## Initial 42 MHz tuning matrix
@@ -215,10 +215,35 @@ read-only, so all of these writes used the bounded DMA16/DMA8/WORD/PIO paths.
 
 This clean write baseline enables the next isolated experiment. `MCDiag SYNC`
 uses the driver's private command to request SDTR factor 50 (5 MB/s), offset 4,
-then compares read-only 64, 128 and 512 KiB commands with an asynchronous
-reference. It rejects any faster/larger counterproposal, detects parity and
-illegal-operation errors, and always resets the SCSI bus back to asynchronous
-mode before returning. Production I/O never negotiates sync.
+then compares read-only 512 B, 4 KiB, 64 KiB, 128 KiB and 512 KiB commands with
+an asynchronous reference. It rejects any faster/larger counterproposal,
+detects parity and illegal-operation errors, and always resets the SCSI bus
+back to asynchronous mode before returning. Production I/O never negotiates
+sync.
+
+### First synchronous-transfer hardware result
+
+The first offset-4 build negotiated successfully: the disk replied with period
+factor 50 and offset 4, and the CF94 accepted period register value 8. The
+machine then locked before the first synchronous read completed. The last
+screen output was the successful negotiation line; no synchronous read result
+was written to the log.
+
+This exposed an IRQ-path assumption rather than an SDTR failure. `irq_move()`
+used the board's 16-byte-ready flag while at least 16 bytes remained and used
+the word-ready flag only for the final shorter tail. With a synchronous offset
+of four, the target can stop after four outstanding bytes. The board can
+therefore assert word-ready and INT2 without ever reaching the 16-byte-ready
+threshold. Returning without reading the word leaves INT2 asserted and traps
+the CPU in the level-2 interrupt chain.
+
+The IRQ path now consumes word-ready data whenever a 16-byte batch is not
+available, regardless of the remaining command length. Normal asynchronous
+transfers retain the 16-byte fast path. The next diagnostic starts with 512 B
+and 4 KiB sync reads before attempting 64, 128 and 512 KiB. Its word/burst
+counters will also show the performance consequence: offset 4 is expected to
+force word transfers, so successful synchronous handshaking alone does not
+imply a speed improvement on this board interface.
 
 The two fair IRQ ROM16 runs differed from bounded DMA16 by 0.08% and 1.7%.
 That small, unstable gain does not justify removing the software buffer bound.

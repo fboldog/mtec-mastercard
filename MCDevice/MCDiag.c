@@ -719,7 +719,10 @@ static void speed_tests(void)
    the SCSI bus back to asynchronous operation before returning. */
 static void sync_tests(void)
 {
-    static const ULONG sizes[] = { 0x10000, 0x20000, 0x80000 };
+    /* Start small so a data-port/IRQ incompatibility is localized before the
+       throughput runs.  The first two sizes also reveal whether sync has to
+       fall back from 16-byte batches to the board's word-ready handshake. */
+    static const ULONG sizes[] = { 0x200, 0x1000, 0x10000, 0x20000, 0x80000 };
     UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     struct MCSyncReq sr;
     ULONG k, i, j, len, nb, bad, t0, dt, vbmax;

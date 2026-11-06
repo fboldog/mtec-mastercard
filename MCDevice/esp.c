@@ -498,7 +498,11 @@ static ULONG current_count(struct MC *mc, int extended)
    above INT2 (audio, vertical blank, serial) keep running throughout, which
    the polled transfers, done with interrupts off, don't allow. */
 
-/* Moves what the board offers now; returns the bytes moved. */
+/* Moves what the board offers now; returns the bytes moved.  Do not reserve
+   the word path for the tail of a transfer: a synchronous target can have
+   fewer than 16 REQs outstanding, so $D039 may be ready while $C039 can never
+   become ready.  Leaving that word on the board holds INT2 asserted and
+   traps the machine in the level-2 interrupt chain. */
 static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
 {
     struct Xfer *x = &mc->x;
@@ -527,7 +531,7 @@ static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
         x->left -= (UBYTE *)f.buf - x->p;
         x->p = (UBYTE *)f.buf;
     }
-    while (x->left && x->left < 16 && ((*f16 | *fw) & 0x80)) {
+    while (x->left && ((*f16 | *fw) & 0x80)) {
         if (x->left >= 2) {
             if (x->in)
                 *(UWORD *)x->p = *pw;
