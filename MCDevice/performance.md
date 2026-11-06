@@ -29,7 +29,7 @@ as a comparison.
 | Bulk IRQ behavior | A 64 KiB read normally takes two server entries and zero timer sleeps. M-Tec's disassembled handler uses the same four-longword transfer and a similar run of DREQ tests. | `MC_FAST_POLLS` cannot materially accelerate the bulk inner loop. |
 | IRQ duration | Exec recommends deferring lengthy interrupt work, but the board holds INT2 active while DREQ is asserted. Returning without moving the data would immediately retrigger the PORTS interrupt, and the byte-exact original-ROM disassembly uses no mask or acknowledge register. | Keep the IRQ copy. A software interrupt alone does not solve this; a card-local mask would require new hardware evidence. |
 | Disconnect/reselect | IDENTIFY forbids disconnect and the driver executes one request at a time. | Low priority for one solid-state target; potentially important with multiple targets or mechanical disks. |
-| Synchronous SCSI | Production commands remain asynchronous. Previous sync tests used the old driver, offset 15, and showed FIFO/illegal-operation risk with no speed gain. | The new driver negotiates 5 MB/s at offset 4, but the first read exposed an IRQ word-ready deadlock. The fallback is fixed and awaiting its second hardware run; sync is never enabled automatically. |
+| Synchronous SCSI | Production commands remain asynchronous. Previous sync tests used the old driver, offset 15, and showed FIFO/illegal-operation risk with no speed gain. | Offset 4 now negotiates and no longer deadlocks, but the first 512-byte read uses 248 word moves after one burst and stops before status phase. This cannot improve throughput; production sync is rejected. |
 | Write performance | Correctness and restore tests exist, but comparable write-throughput measurements do not. | Add restored-area write timing before tuning the output loop. |
 
 ## Initial 42 MHz tuning matrix
@@ -244,6 +244,57 @@ and 4 KiB sync reads before attempting 64, 128 and 512 KiB. Its word/burst
 counters will also show the performance consequence: offset 4 is expected to
 force word transfers, so successful synchronous handshaking alone does not
 imply a speed improvement on this board interface.
+
+### Second synchronous-transfer hardware result
+
+The complete second-run logs are
+[`read`](logs/mcdiag-16-sync-v2-read.log),
+[`write`](logs/mcdiag-16-sync-v2-write.log), and
+[`sync`](logs/mcdiag-16-sync-v2-sync.log). The ordinary read run completed with
+87 passes, no failures and one unsupported skip; `devtest` measured
+5929/5612/4602 KiB/s for 512/128/32 KiB requests. The write run completed with
+106 passes, no failures and one skip, including restoration of every modified
+medium area.
+
+The word-ready fallback removed the machine lock. SDTR again completed at
+factor 50, offset 4. The first 512-byte synchronous read then moved all 512
+bytes but stopped with `HFERR_Phase`: one 16-byte burst, 248 word moves,
+`STAT=91`, `INTR=10`, `SSTEP=CC`, and FIFO-flags value 8. The driver reset the
+bus and successfully returned the target to asynchronous operation.
+
+This result matches the AMD controller description more closely than an FIFO
+overflow theory. In synchronous Data-In, the transfer counter decrements on
+DACK and reaching zero can complete the DMA command while the FIFO is not
+empty. The FIFO-flags register is also latched on entry to synchronous Data-In,
+so the ordinary asynchronous completion code cannot interpret its value as a
+live FIFO count. A correct sync-only completion tail would need separate phase
+and FIFO handling.
+
+That additional work cannot make sync a performance win on this card. The
+512-byte command already demonstrates the limiting path: after the one initial
+burst, 496 of 512 bytes crossed the CPU port as individual words. The normal
+asynchronous path moves all 512 bytes as 32 bounded 16-byte bursts. Larger sync
+reads would therefore converge on the measured slow WORD path rather than the
+DMA16 result. Sync remains useful as a controller diagnostic, but is not a
+production optimization and no further risky media test is justified for
+performance.
+
+The sync log's three pre-test failures were unrelated: REQUEST SENSE returned
+pending sense data once and cleared it, so the three following calls correctly
+returned different bytes. MCDiag now runs this state-consuming command only
+once instead of treating repeated payloads as a transfer-mode comparison.
+
+### Startup logging stall
+
+The normal log contains no unexplained command stall. Its longest deliberately
+slow operations are about 100 ms for a 64 KiB WORD read and 319 ms for a 4 KiB
+PIO read. MCDiag's timer stops before each log line is printed, however, and the
+startup run previously called `Flush()` on `DF0:` after every line. Physical
+floppy writes can therefore create visible multi-second pauses absent from the
+SCSI timings. The startup sequence now logs the stable MCDiag read suite to RAM
+and copies the completed log to `DF0:` before appending devtest output. The
+opt-in sync diagnostic continues logging directly to floppy so a hardware hang
+still leaves the last completed checkpoint.
 
 The two fair IRQ ROM16 runs differed from bounded DMA16 by 0.08% and 1.7%.
 That small, unstable gain does not justify removing the software buffer bound.
