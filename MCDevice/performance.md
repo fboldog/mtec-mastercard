@@ -667,6 +667,21 @@ one negotiation, querying sync state between passes. This will show whether
 the v20 result was a transient fast state, a benchmark anomaly, or a mode that
 can be entered repeatably without renegotiation.
 
+The v23 result is
+[`logs/mcdiag-37-sync-v23-auto-repeat.log`](logs/mcdiag-37-sync-v23-auto-repeat.log).
+All three passes remained synchronized at period 8/offset 8 and produced
+nearly identical results: 512 KiB stayed around 5.66 MiB/s, 128 KiB around
+1.45 MiB/s, 32 KiB around 0.61 MiB/s, and command latency stayed at 15.08 ms.
+The final reset returned the unit to 0/0. V20's all-size fast result was an
+outlier rather than a mode reached after warm-up.
+
+Offset 8 is therefore correct but not a production performance win. The last
+bounded read-only candidate is offset 15: v19 proved that the capped 12-byte
+group is exact and raises the longword share to 75%. V24 manually negotiates
+offset 15 and runs three ordinary benchmark passes without renegotiating. If
+the smaller transfers do not improve consistently, automatic sync should be
+retired and the production driver should remain asynchronous.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

@@ -1,0 +1,18 @@
+; Final read-only sync candidate: manually negotiate factor 50 / offset 15,
+; run three normal throughput passes, then reset and verify async restoration.
+FailAt 21
+Echo "Sync offset-15 repeat test: three read-only passes."
+Set u `MCDiag FINDUNIT`
+MCDiag UNIT $u ENABLESYNC OFFSET 15 LOG DF0:mcsync-driver15.log
+MCDiag UNIT $u SYNCINFO >>DF0:mcsync-driver15.log
+Echo "== pass 1" >>DF0:mcsync-driver15.log
+devtest -bb mastercard.device $u >>DF0:mcsync-driver15.log
+Echo "== pass 2" >>DF0:mcsync-driver15.log
+devtest -bb mastercard.device $u >>DF0:mcsync-driver15.log
+Echo "== pass 3" >>DF0:mcsync-driver15.log
+devtest -bb mastercard.device $u >>DF0:mcsync-driver15.log
+MCDiag UNIT $u SYNCINFO >>DF0:mcsync-driver15.log
+MCDiag UNIT $u DISABLESYNC >>DF0:mcsync-driver15.log
+MCDiag UNIT $u SYNCINFO >>DF0:mcsync-driver15.log
+Echo "== done" >>DF0:mcsync-driver15.log
+Echo "Done. The result is DF0:mcsync-driver15.log."

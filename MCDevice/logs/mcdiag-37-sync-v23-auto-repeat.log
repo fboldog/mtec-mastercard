@@ -1,0 +1,94 @@
+MCDiag 0.1 - data port tests for mastercard.device
+Opening unit 1 (loads the driver: chip and bus reset, 2-3 s)
+DRIVER SYNC INFO  CF94 period 0 offset 0 (asynchronous)
+
+RESULT 1 ok, 0 failed, 0 skipped
+== pass 1 (first read triggers automatic SDTR)
+Test mastercard.device 1 with Zorro II RAM
+read  512 KB xfers          5670 KB/sec (100% CPU)
+read  128 KB xfers          1480 KB/sec (100% CPU)
+read   32 KB xfers           608 KB/sec (100% CPU)
+OpenDevice / CloseDevice    0.018 ms
+OpenDevice multiple         0.010 ms
+CloseDevice multiple        0.002 ms
+TD_GETGEOMETRY sequential   2.100 ms
+TD_GETGEOMETRY parallel     3.001 ms
+TD_CHANGENUM                0.005 ms 
+TD_CHANGENUM quick          0.001 ms 
+CMD_INVALID                 0.023 ms 
+CMD_START                   1.022 ms 
+CMD_READ butterfly average  0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly far      0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly constant 0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ sequential         15.081 ms 
+CMD_READ parallel           15.081 ms
+HD_SCSICMD read sequential  15.081 ms
+HD_SCSICMD read parallel    15.080 ms
+MCDiag 0.1 - data port tests for mastercard.device
+Opening unit 1 (loads the driver: chip and bus reset, 2-3 s)
+DRIVER SYNC INFO  CF94 period 8 offset 8 (synchronous)
+
+RESULT 1 ok, 0 failed, 0 skipped
+== pass 2
+Test mastercard.device 1 with Zorro II RAM
+read  512 KB xfers          5647 KB/sec (100% CPU)
+read  128 KB xfers          1479 KB/sec (100% CPU)
+read   32 KB xfers           608 KB/sec (100% CPU)
+OpenDevice / CloseDevice    0.018 ms
+OpenDevice multiple         0.010 ms
+CloseDevice multiple        0.002 ms
+TD_GETGEOMETRY sequential   2.097 ms
+TD_GETGEOMETRY parallel     2.099 ms
+TD_CHANGENUM                0.005 ms 
+TD_CHANGENUM quick          0.001 ms 
+CMD_INVALID                 0.023 ms 
+CMD_START                   1.021 ms 
+CMD_READ butterfly average  0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly far      0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly constant 0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ sequential         15.077 ms 
+CMD_READ parallel           15.081 ms
+HD_SCSICMD read sequential  15.081 ms
+HD_SCSICMD read parallel    15.081 ms
+MCDiag 0.1 - data port tests for mastercard.device
+Opening unit 1 (loads the driver: chip and bus reset, 2-3 s)
+DRIVER SYNC INFO  CF94 period 8 offset 8 (synchronous)
+
+RESULT 1 ok, 0 failed, 0 skipped
+== pass 3
+Test mastercard.device 1 with Zorro II RAM
+read  512 KB xfers          5658 KB/sec (100% CPU)
+read  128 KB xfers          1389 KB/sec (100% CPU)
+read   32 KB xfers           610 KB/sec (100% CPU)
+OpenDevice / CloseDevice    0.018 ms
+OpenDevice multiple         0.010 ms
+CloseDevice multiple        0.002 ms
+TD_GETGEOMETRY sequential   2.100 ms
+TD_GETGEOMETRY parallel     2.100 ms
+TD_CHANGENUM                0.005 ms 
+TD_CHANGENUM quick          0.001 ms 
+CMD_INVALID                 0.023 ms 
+CMD_START                   1.021 ms 
+CMD_READ butterfly average  0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly far      0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly constant 0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ sequential         15.082 ms 
+CMD_READ parallel           15.081 ms
+HD_SCSICMD read sequential  15.078 ms
+HD_SCSICMD read parallel    15.084 ms
+MCDiag 0.1 - data port tests for mastercard.device
+Opening unit 1 (loads the driver: chip and bus reset, 2-3 s)
+DRIVER SYNC INFO  CF94 period 8 offset 8 (synchronous)
+
+RESULT 1 ok, 0 failed, 0 skipped
+MCDiag 0.1 - data port tests for mastercard.device
+Opening unit 1 (loads the driver: chip and bus reset, 2-3 s)
+DRIVER SYNC OFF   asynchronous restore ok (SCSI bus reset)
+
+RESULT 1 ok, 0 failed, 0 skipped
+MCDiag 0.1 - data port tests for mastercard.device
+Opening unit 1 (loads the driver: chip and bus reset, 2-3 s)
+DRIVER SYNC INFO  CF94 period 0 offset 0 (asynchronous)
+
+RESULT 1 ok, 0 failed, 0 skipped
+== done
