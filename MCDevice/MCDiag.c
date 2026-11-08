@@ -787,7 +787,7 @@ static void speed_tests(void)
    conservative 5 MB/s / offset 4 agreement, and always resets the SCSI bus
    back to asynchronous operation before returning. With WRITE it also saves,
    tests and asynchronously restores a 512 KiB medium region. */
-static void sync_tests(int write, ULONG wlba)
+static void sync_tests(int write, ULONG wlba, ULONG ask_offset)
 {
     /* Start small so a data-port/IRQ incompatibility is localized before the
        throughput runs. */
@@ -804,8 +804,13 @@ static void sync_tests(int write, ULONG wlba)
     int saved = 0, attempted = 0;
     LONG e;
 
-    P("\n== SYNC diagnostic: ask 5 MB/s offset 4%s ==\n",
+    P("\n== SYNC diagnostic: ask 5 MB/s offset %lu%s ==\n", ask_offset,
       (ULONG)(write ? ", 512 KiB write/restore" : ", read-only"));
+    if (ask_offset < 4 || ask_offset > 15) {
+        P("SYNC               skipped: offset must be 4..15\n");
+        skips++;
+        return;
+    }
     if (!efreq || !bsize || workbufsize < 0x80000 + 16) {
         P("SYNC               skipped: EClock, medium or large buffers unavailable\n");
         skips++;
@@ -858,7 +863,7 @@ static void sync_tests(int write, ULONG wlba)
         skips++;
         return;
     }
-    e = sync_control(50, 4, &sr);
+    e = sync_control(50, (UBYTE)ask_offset, &sr);
     if (e || !sr.offset) {
         P("SYNC negotiate     ERR %ld step %lu reply factor %lu offset %lu [%02lx %02lx %02lx]\n",
           e, (ULONG)sr.step, (ULONG)sr.period, (ULONG)sr.offset,
@@ -1151,7 +1156,8 @@ static int open_unit(ULONG unit)
     return !OpenDevice((STRPTR)DEV_NAME, unit, (struct IORequest *)&io, 0);
 }
 
-static void unit_tests(ULONG unit, int write, ULONG wlba, int sync, int fast, int offsets)
+static void unit_tests(ULONG unit, int write, ULONG wlba, int sync, int fast,
+                       int offsets, ULONG sync_offset)
 {
     static const UBYTE inq36[6] = { 0x12, 0, 0, 0, 36, 0 };
     static const UBYTE inq37[6] = { 0x12, 0, 0, 0, 37, 0 };
@@ -1220,7 +1226,7 @@ static void unit_tests(ULONG unit, int write, ULONG wlba, int sync, int fast, in
         else if (offsets)
             sync_ladder_tests(1);
         else
-            sync_tests(write, wlba);
+            sync_tests(write, wlba, sync_offset);
     }
 }
 
@@ -1320,7 +1326,8 @@ LONG start(void)
             driver_sync(args[11] != 0, args[14] ? *(ULONG *)args[14] : 4);
         else
             unit_tests(unit, args[2] != 0, args[3] ? *(ULONG *)args[3] : 0,
-                       args[8] != 0, args[9] != 0, args[13] != 0);
+                       args[8] != 0, args[9] != 0, args[13] != 0,
+                       args[14] ? *(ULONG *)args[14] : 4);
         CloseDevice((struct IORequest *)&io);
     }
     P("\nRESULT %lu ok, %lu failed, %lu skipped\n", oks, fails, skips);

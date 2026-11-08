@@ -623,6 +623,20 @@ similar large-read samples. V20 leaves offset 8 active only for the existing
 read-only ordinary-driver suite, then explicitly resets the bus to async. Disk
 writes remain untested and disabled at that offset.
 
+The v20 result is
+[`logs/mcdiag-34-sync-v20-driver-offset8.log`](logs/mcdiag-34-sync-v20-driver-offset8.log).
+Every ordinary API and capacity check passed, and the final reset restored
+asynchronous operation. Offset 8 produced 5983, 5596 and 4720 KiB/s for 512,
+128 and 32 KiB reads. These are effectively the same as the established async
+baseline (roughly 5980/5600/4700) and dramatically better than offset 4
+(5041/1431/444). Command latency likewise recovered from about 20 ms to 3 ms.
+
+This is the first normal-I/O sync configuration without a performance
+regression. It is not ready for automatic use until the same bounded offset-8
+grouping is validated for Data-Out. V21 therefore repeats the failure-safe
+512 KiB synchronous write/readback test at offset 8, followed by a bus reset
+and full asynchronous restoration and verification of the original region.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

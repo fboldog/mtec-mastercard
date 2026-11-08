@@ -1,0 +1,8 @@
+; Failure-safe synchronous Data-Out test at offset 8. A 512 KiB region is
+; saved asynchronously, written/read synchronously, then restored and verified
+; asynchronously. For another place, add: LBA n
+FailAt 21
+Echo "Experimental sync WRITE test: 512 KiB, offset 8, saved/restored."
+Set u `MCDiag FINDUNIT`
+MCDiag UNIT $u SYNC WRITE OFFSET 8 LOG DF0:mcsync-write8.log
+Echo "Done. Check DF0:mcsync-write8.log for the restore result."
