@@ -730,6 +730,22 @@ DMA, extended-count reads, error handling and the interrupt mover remain.
 V26 runs the full read-only startup regression with the stripped
 `mastercard-prod-irq.device`, matching the production ROM's sync feature set.
 
+The v26 result is
+[`logs/mcdiag-40-production-async-v26.log`](logs/mcdiag-40-production-async-v26.log).
+The embedded 11080-byte driver has SHA-1
+`e199b264b99fba68e3298469f5faca7206659c0c`, exactly matching the stripped
+production build. It completed with 84 passes, no failures and the same one
+BlueSCSI WRITE/READ BUFFER skip. The ordinary driver benchmark measured 5977,
+5599 and 4644 KiB/s for 512, 128 and 32 KiB requests, with 3.019 ms sequential
+command latency. These are within normal run-to-run variation of v25's 5987,
+5613 and 4617 KiB/s and 3.017 ms. The 512 KiB diagnostic phases measured 5696
+KiB/s for bounded DMA16 and 5804 KiB/s for EXT24; all data and guard checks
+passed.
+
+This validates the exact sync-stripped production driver on hardware. Removing
+the diagnostic-only negotiation/control code recovered ROM space without a
+measurable asynchronous compatibility, integrity or performance regression.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately
