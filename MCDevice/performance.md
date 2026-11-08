@@ -637,6 +637,21 @@ grouping is validated for Data-Out. V21 therefore repeats the failure-safe
 512 KiB synchronous write/readback test at offset 8, followed by a bus reset
 and full asynchronous restoration and verification of the original region.
 
+The v21 result is
+[`logs/mcdiag-35-sync-v21-write-offset8.log`](logs/mcdiag-35-sync-v21-write-offset8.log).
+The 512 KiB Data-Out and readback were byte-exact, both used one extended
+phase with `l65536 w131072`, and the full original region at LBA 15710932 was
+restored and verified asynchronously. The run finished at 96/0/1. The write
+took 120.703 ms and readback 95.455 ms; timing remains too variable for a bus
+rate claim, but both directions now have integrity coverage at offset 8.
+
+V22 introduces a separate opt-in auto-sync driver build. It negotiates factor
+50/offset 8 lazily before the first normal block command, keeps targets that
+reject SDTR asynchronous, and retries negotiation only after a bus reset.
+The established default driver remains asynchronous. A private read-only
+status query records whether automatic negotiation actually became active;
+the test then runs the ordinary driver suite and explicitly resets to async.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

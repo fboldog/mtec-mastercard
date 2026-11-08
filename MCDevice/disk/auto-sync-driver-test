@@ -1,0 +1,16 @@
+; Read-only test of the opt-in auto-negotiating driver. Record state before
+; and after ordinary I/O, then explicitly reset and verify async restoration.
+FailAt 21
+Echo "Automatic sync driver test: read-only, factor 50 / offset 8."
+Set u `MCDiag FINDUNIT`
+MCDiag UNIT $u SYNCINFO LOG DF0:mcautosync.log
+Echo "== ordinary device API should trigger automatic SDTR" >>DF0:mcautosync.log
+devtest -p mastercard.device >>DF0:mcautosync.log
+devtest -g mastercard.device $u >>DF0:mcautosync.log
+devtest -t mastercard.device $u >>DF0:mcautosync.log
+devtest -bb mastercard.device $u >>DF0:mcautosync.log
+MCDiag UNIT $u SYNCINFO >>DF0:mcautosync.log
+MCDiag UNIT $u DISABLESYNC >>DF0:mcautosync.log
+MCDiag UNIT $u SYNCINFO >>DF0:mcautosync.log
+Echo "== done" >>DF0:mcautosync.log
+Echo "Done. The result is DF0:mcautosync.log."

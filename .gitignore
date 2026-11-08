@@ -25,6 +25,7 @@ MTecPatch/Reboot
 **/gen/stubs.h
 MCDevice/mastercard.device
 MCDevice/mastercard-irq.device
+MCDevice/mastercard-sync-irq.device
 MCDevice/MCDiag
 MCDevice/gen/
 *.hunk

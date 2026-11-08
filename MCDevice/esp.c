@@ -178,6 +178,7 @@ void esp_busreset(struct MC *mc)
         if (mc->units[k]) {
             mc->units[k]->sync_period = 0;
             mc->units[k]->sync_offset = 0;
+            mc->units[k]->sync_tried = 0;
         }
     mc_delay(mc, 250000);
 }

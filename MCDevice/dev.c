@@ -76,6 +76,30 @@ __attribute__((used)) void *memcpy(void *d, const void *s, unsigned long n)
 static LONG scsi(struct MC *mc, struct MCUnit *u, UBYTE *cdb, UWORD cdblen, void *data, ULONG len,
                  UBYTE in, ULONG *actual, UBYTE *status);
 
+#if MC_AUTO_SYNC
+/* Negotiate once, lazily, so probing and capacity discovery remain on the
+   conservative async path. A reject is a valid async result. A transport
+   failure resets the bus; remember that attempt for this unit so one failing
+   target cannot cause a reset loop. Other units may retry after that reset. */
+static void auto_sync(struct MC *mc, struct MCUnit *u)
+{
+    struct MCSyncReq r;
+    LONG err;
+
+    if (u->sync_tried)
+        return;
+    memset(&r, 0, sizeof r);
+    r.ask_period = MC_AUTO_SYNC_PERIOD;
+    r.ask_offset = MC_AUTO_SYNC_OFFSET;
+    err = esp_sync(mc, u->target, u->lun, &r);
+    if (!err) {
+        u->sync_period = r.chip_period;
+        u->sync_offset = r.offset;
+    }
+    u->sync_tried = 1;
+}
+#endif
+
 /* REQUEST SENSE into mc->sense; returns the sense key or -1. */
 static LONG sense(struct MC *mc, struct MCUnit *u)
 {
@@ -247,6 +271,9 @@ static void rw(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior, ULONG hi, 
         ior->io_Error = IOERR_BADADDRESS;   /* past 2^32 blocks */
         return;
     }
+#if MC_AUTO_SYNC
+    auto_sync(mc, u);
+#endif
     while (done < len) {
         ULONG n = len - done, actual = 0, blocks;
         UBYTE cdb[10];
@@ -395,7 +422,20 @@ static void syncdiag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
 {
     struct MCSyncReq *r = ior->io_Data;
 
-    if (ior->io_Length < sizeof *r || r->ask_offset > 15 ||
+    if (ior->io_Length < sizeof *r) {
+        ior->io_Error = IOERR_BADLENGTH;
+        return;
+    }
+    if (r->ask_offset == 0xFF) {        /* private read-only status query */
+        r->period = 0;
+        r->offset = u->sync_offset;
+        r->chip_period = u->sync_period;
+        r->step = r->stat = r->intr = r->seq = 0;
+        r->err = 0;
+        ior->io_Actual = sizeof *r;
+        return;
+    }
+    if (r->ask_offset > 15 ||
         (r->ask_offset && r->ask_period < 25)) {
         ior->io_Error = IOERR_BADLENGTH;
         return;
@@ -404,6 +444,7 @@ static void syncdiag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     if (!r->err) {
         u->sync_period = r->chip_period;
         u->sync_offset = r->offset;
+        u->sync_tried = 1;
     }
     ior->io_Actual = sizeof *r;
 }

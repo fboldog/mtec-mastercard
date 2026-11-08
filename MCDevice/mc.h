@@ -48,6 +48,12 @@ static inline void NewList(struct List *l)
 #define MC_SYNC_EXT_MIN 0x00010000UL    /* 64 KiB */
 #endif
 
+#ifndef MC_AUTO_SYNC
+#define MC_AUTO_SYNC 0                 /* opt-in build until full boot testing */
+#endif
+#define MC_AUTO_SYNC_PERIOD 50         /* 5 MB/s SDTR factor */
+#define MC_AUTO_SYNC_OFFSET 8          /* validated bounded grouping */
+
 #define MC_REGS     0xC000
 #define MC_DREQ16   0xC039
 #define MC_DREQ8    0xC839
@@ -130,6 +136,7 @@ struct MCUnit {
     UBYTE wprot;            /* write-protected, for TD_PROTSTATUS */
     UBYTE sync_period;      /* CF94 register value, 0 for asynchronous */
     UBYTE sync_offset;
+    UBYTE sync_tried;       /* automatic SDTR attempted since the last reset */
     ULONG blocks;           /* last LBA + 1, 0 if unknown or over 4G */
     ULONG changes;          /* TD_CHANGENUM */
     struct List changeints;
