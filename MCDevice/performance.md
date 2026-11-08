@@ -754,6 +754,19 @@ the saved write/readback/restore suite. It retains separate `mcdiag.log` and
 future general-purpose test images do not write to every detected disk merely
 by booting.
 
+The first v27 HDF/default-speed results are
+[`logs/mcdiag-41-hdf-default-v27-read.log`](logs/mcdiag-41-hdf-default-v27-read.log)
+and
+[`logs/mcdiag-42-hdf-default-v27-write.log`](logs/mcdiag-42-hdf-default-v27-write.log).
+The read suite completed at 84/0/1 and the write suite at 103/0/1. Every
+DMA16, DMA8, WORD and PIO write/readback combination passed at 512 bytes and 4
+KiB; all three tested write movers also passed across the 64 KiB boundary at
+66048 bytes. The original data was restored after every group. Ordinary reads
+measured 5988, 5620 and 4568 KiB/s for 512, 128 and 32 KiB requests, essentially
+matching the raw/default v26 result. HDF backing therefore adds no measurable
+penalty on this card and SD-card setup. This becomes the control run for the
+same HDF with BlueSCSI TurboMax/Fast20 enabled.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately
