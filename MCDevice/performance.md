@@ -607,6 +607,22 @@ negotiated offset, rounded down to a longword: 4, 8 or 12 bytes, never the old
 unsafe 16-byte burst. The same read-only offset ladder will stop immediately
 if that scaling assumption is wrong.
 
+The v19 result is
+[`logs/mcdiag-33-sync-v19-offset-burst.log`](logs/mcdiag-33-sync-v19-offset-burst.log).
+All offsets and resets passed again at 88/0/1. More importantly, the exact
+mover counts scaled as predicted: offset 4 used `l32768 w196608` (25% of bytes
+by longword), offset 8 used `l65536 w131072` (50%), and offsets 12/15 used
+`l98304 w65536` (75%). This proves that consuming no more than the negotiated
+offset after one fresh `$C039` sample is safe for Data-In on this target.
+
+The timing still cannot select a winner: offset 15 reported an impossible
+10.9 MiB/s at a negotiated 5 MB/s, while offset 12 was slower than offset 8
+despite identical mover counts. Offset 8 is the conservative candidate because
+it halves the word traffic, uses an even power-of-two credit, and produced two
+similar large-read samples. V20 leaves offset 8 active only for the existing
+read-only ordinary-driver suite, then explicitly resets the bus to async. Disk
+writes remain untested and disabled at that offset.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

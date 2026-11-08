@@ -9,3 +9,4 @@ MCDiag TAKEOVER LOADONLY
 Echo "Ready: Execute S:sync-test"
 Echo "Production-path test: Execute S:sync-driver-test"
 Echo "Next optimization: Execute S:sync-offset-test"
+Echo "Offset-8 driver test: Execute S:sync-driver-offset8-test"

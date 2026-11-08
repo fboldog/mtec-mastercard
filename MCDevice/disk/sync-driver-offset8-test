@@ -1,0 +1,14 @@
+; Opt-in normal-I/O sync test at offset 8. Run devtest through the ordinary
+; read-only device API, then reset the bus back to asynchronous operation.
+FailAt 21
+Echo "Normal driver sync test: read-only, 5 MB/s offset 8."
+Set u `MCDiag FINDUNIT`
+MCDiag UNIT $u ENABLESYNC OFFSET 8 LOG DF0:mcsync-driver8.log
+Echo "== ordinary device API on synchronized unit $u, offset 8" >>DF0:mcsync-driver8.log
+devtest -p mastercard.device >>DF0:mcsync-driver8.log
+devtest -g mastercard.device $u >>DF0:mcsync-driver8.log
+devtest -t mastercard.device $u >>DF0:mcsync-driver8.log
+devtest -bb mastercard.device $u >>DF0:mcsync-driver8.log
+MCDiag UNIT $u DISABLESYNC >>DF0:mcsync-driver8.log
+Echo "== done" >>DF0:mcsync-driver8.log
+Echo "Done. The result is DF0:mcsync-driver8.log."
