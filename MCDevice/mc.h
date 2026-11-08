@@ -136,7 +136,9 @@ struct MCUnit {
     UBYTE wprot;            /* write-protected, for TD_PROTSTATUS */
     UBYTE sync_period;      /* CF94 register value, 0 for asynchronous */
     UBYTE sync_offset;
+#if MC_AUTO_SYNC
     UBYTE sync_tried;       /* automatic SDTR attempted since the last reset */
+#endif
     ULONG blocks;           /* last LBA + 1, 0 if unknown or over 4G */
     ULONG changes;          /* TD_CHANGENUM */
     struct List changeints;

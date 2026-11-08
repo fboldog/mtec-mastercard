@@ -444,7 +444,9 @@ static void syncdiag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     if (!r->err) {
         u->sync_period = r->chip_period;
         u->sync_offset = r->offset;
+#if MC_AUTO_SYNC
         u->sync_tried = 1;
+#endif
     }
     ior->io_Actual = sizeof *r;
 }

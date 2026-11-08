@@ -29,7 +29,7 @@ as a comparison.
 | Bulk IRQ behavior | A 64 KiB read normally takes two server entries and zero timer sleeps. M-Tec's disassembled handler uses the same four-longword transfer and a similar run of DREQ tests. | `MC_FAST_POLLS` cannot materially accelerate the bulk inner loop. |
 | IRQ duration | Exec recommends deferring lengthy interrupt work, but the board holds INT2 active while DREQ is asserted. Returning without moving the data would immediately retrigger the PORTS interrupt, and the byte-exact original-ROM disassembly uses no mask or acknowledge register. | Keep the IRQ copy. A software interrupt alone does not solve this; a card-local mask would require new hardware evidence. |
 | Disconnect/reselect | IDENTIFY forbids disconnect and the driver executes one request at a time. | Low priority for one solid-state target; potentially important with multiple targets or mechanical disks. |
-| Synchronous SCSI | Production commands remain asynchronous. Previous sync tests used the old driver, offset 15, and showed FIFO/illegal-operation risk with no speed gain. | Offset 4 now negotiates and no longer deadlocks, but the first 512-byte read uses 248 word moves after one burst and stops before status phase. This cannot improve throughput; production sync is rejected. |
+| Synchronous SCSI | Offset 4, 8 and 15 transport is byte-exact in both directions; bounded groups consume at most the negotiated offset, and 24-bit phases avoid 64 KiB restarts. | Diagnostic-only. Repeated ordinary-I/O tests at offsets 8 and 15 sustain large reads but regress 128/32 KiB throughput and latency severely versus async. Production commands remain asynchronous. |
 | Write performance | Correctness and restore tests exist, but comparable write-throughput measurements do not. | Add restored-area write timing before tuning the output loop. |
 
 ## Initial 42 MHz tuning matrix
@@ -681,6 +681,23 @@ group is exact and raises the longword share to 75%. V24 manually negotiates
 offset 15 and runs three ordinary benchmark passes without renegotiating. If
 the smaller transfers do not improve consistently, automatic sync should be
 retired and the production driver should remain asynchronous.
+
+The v24 result is
+[`logs/mcdiag-38-sync-v24-driver-offset15.log`](logs/mcdiag-38-sync-v24-driver-offset15.log).
+All three passes remained synchronized at period 8/offset 15, and the final
+reset restored 0/0. Rates were 5122-5788 KiB/s at 512 KiB, 1320-1398 KiB/s at
+128 KiB and 835-837 KiB/s at 32 KiB, with 12.01 ms command latency. Offset 15
+improves the smallest result over offset 8, but remains roughly 82% slower than
+the async 32 KiB baseline and four times the async latency. It also does not
+improve 128 KiB throughput.
+
+This closes the synchronous-performance investigation. The transport,
+negotiation, reset recovery, extended counter, Data-In and Data-Out paths are
+correct, but none of the repeatable configurations beats asynchronous normal
+I/O across realistic request sizes. Automatic synchronization remains an
+explicit experimental build only; the production driver and ROM stay async.
+V25 is a final full asynchronous integrity/performance regression using the
+normal startup suite and the standard interrupt-driven driver.
 
 ### Startup logging stall
 
