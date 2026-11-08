@@ -699,6 +699,24 @@ explicit experimental build only; the production driver and ROM stay async.
 V25 is a final full asynchronous integrity/performance regression using the
 normal startup suite and the standard interrupt-driven driver.
 
+The v25 result is
+[`logs/mcdiag-39-final-async-v25.log`](logs/mcdiag-39-final-async-v25.log).
+It completed with 84 passes, no failures and one target-specific skip. The
+ordinary driver benchmark measured 5987, 5613 and 4617 KiB/s for 512, 128 and
+32 KiB requests, with 3.017 ms sequential command latency. The 512 KiB phase
+comparison measured 5703 KiB/s for bounded DMA16 and 5791 KiB/s for EXT24.
+All data and guard checks passed.
+
+The remaining WRITE/READ BUFFER skip is a BlueSCSI command-implementation
+asymmetry rather than a host-transfer failure. READ BUFFER descriptor mode
+reports a 65532-byte target buffer and WRITE BUFFER data mode accepts all 64
+test bytes with GOOD status, but the corresponding READ BUFFER data-mode
+command returns CHECK CONDITION without a data phase. BlueSCSI's
+[command matrix](https://bluescsi.com/docs/Developers-(Advanced)) documents
+both optional commands as implemented, so MCDiag preserves this useful
+diagnostic but does not fail the disk/driver integrity suite when the target
+cannot return the written buffer.
+
 ### Diagnostic-only sync build
 
 `MC_SYNC_DIAG` now separates the SDTR/private-control implementation from the
