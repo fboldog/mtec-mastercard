@@ -1,0 +1,19 @@
+; Repeat the normal throughput benchmark three times under one automatic
+; offset-8 negotiation, querying state after every pass, then reset to async.
+FailAt 21
+Echo "Automatic sync repeat test: three read-only passes."
+Set u `MCDiag FINDUNIT`
+MCDiag UNIT $u SYNCINFO LOG DF0:mcautosync-repeat.log
+Echo "== pass 1 (first read triggers automatic SDTR)" >>DF0:mcautosync-repeat.log
+devtest -bb mastercard.device $u >>DF0:mcautosync-repeat.log
+MCDiag UNIT $u SYNCINFO >>DF0:mcautosync-repeat.log
+Echo "== pass 2" >>DF0:mcautosync-repeat.log
+devtest -bb mastercard.device $u >>DF0:mcautosync-repeat.log
+MCDiag UNIT $u SYNCINFO >>DF0:mcautosync-repeat.log
+Echo "== pass 3" >>DF0:mcautosync-repeat.log
+devtest -bb mastercard.device $u >>DF0:mcautosync-repeat.log
+MCDiag UNIT $u SYNCINFO >>DF0:mcautosync-repeat.log
+MCDiag UNIT $u DISABLESYNC >>DF0:mcautosync-repeat.log
+MCDiag UNIT $u SYNCINFO >>DF0:mcautosync-repeat.log
+Echo "== done" >>DF0:mcautosync-repeat.log
+Echo "Done. The result is DF0:mcautosync-repeat.log."

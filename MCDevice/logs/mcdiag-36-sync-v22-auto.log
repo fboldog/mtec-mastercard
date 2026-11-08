@@ -1,0 +1,77 @@
+MCDiag 0.1 - data port tests for mastercard.device
+Opening unit 1 (loads the driver: chip and bus reset, 2-3 s)
+DRIVER SYNC INFO  CF94 period 0 offset 0 (asynchronous)
+
+RESULT 1 ok, 0 failed, 0 skipped
+== ordinary device API should trigger automatic SDTR
+  1 QUANTUM  BlueSCSI Pico    1.0  Disk     512  8044 MB
+                 SSize TotalSectors    Cyl Head  Sect DType Removable
+TD_GETGEOMETRY     512     15712256  15587   16    63  0x00 No
+Inquiry                                                0x00 No
+READ_CAPACITY_10   512     15712256
+READ_CAPACITY_16   512     15712256
+Read-to capacity   512     15712256
+Mode Page 0x03     512                             56
+Mode Page 0x04                       17536   16
+Mode Page 0x0c len=22
+Mode Page 0x31 len=42
+TD_GETGEOMETRY     Success  15712256 x 512  C=15587 H=16 S=63 Type=0
+TD_CHANGENUM       Success  Count=1
+TD_CHANGESTATE     Success  Disk present
+TD_PROTSTATUS      Success  Unprotected
+TD_GETDRIVETYPE    Fail -3  IOERR_NOCMD
+TD_GETNUMTRACKS    Success  Tracks=249400
+TD_RAWREAD         Fail -3  IOERR_NOCMD
+CMD_UPDATE         Success
+SCSI command requires at least two arguments (len and cmd)
+SCSICMD Inquiry    Success  V='QUANTUM' P='BlueSCSI Pico' R='1.0' DT=0x0 Linked Sync
+SCSICMD TUR        Success  Ready
+NSCMD_DEVICEQUERY  Success
+CMD_READ           Success
+ETD_READ           Success
+TD_READ64          Success
+NSCMD_TD_READ64    Success
+NSCMD_ETD_READ64   Success
+TD_SEEK            Success
+ETD_SEEK           Success
+TD_SEEK64          Success
+NSCMD_TD_SEEK64    Success
+NSCMD_ETD_SEEK64   Success
+TD_MOTOR ON        Success
+TD_MOTOR OFF       Success
+Test mastercard.device 1 with Zorro II RAM
+read  512 KB xfers          5682 KB/sec (100% CPU)
+read  128 KB xfers          1391 KB/sec (100% CPU)
+read   32 KB xfers           609 KB/sec (100% CPU)
+OpenDevice / CloseDevice    0.018 ms
+OpenDevice multiple         0.010 ms
+CloseDevice multiple        0.002 ms
+TD_GETGEOMETRY sequential   2.099 ms
+TD_GETGEOMETRY parallel     2.099 ms
+TD_CHANGENUM                0.005 ms 
+TD_CHANGENUM quick          0.001 ms 
+CMD_INVALID                 0.024 ms 
+CMD_START                   1.022 ms 
+CMD_READ butterfly average  0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly far      0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly constant 0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ sequential         15.079 ms 
+CMD_READ parallel           15.081 ms
+HD_SCSICMD read sequential  15.078 ms
+HD_SCSICMD read parallel    15.081 ms
+MCDiag 0.1 - data port tests for mastercard.device
+Opening unit 1 (loads the driver: chip and bus reset, 2-3 s)
+DRIVER SYNC INFO  CF94 period 8 offset 8 (synchronous)
+
+RESULT 1 ok, 0 failed, 0 skipped
+MCDiag 0.1 - data port tests for mastercard.device
+Opening unit 1 (loads the driver: chip and bus reset, 2-3 s)
+DRIVER SYNC OFF   asynchronous restore ok (SCSI bus reset)
+
+RESULT 1 ok, 0 failed, 0 skipped
+MCDiag 0.1 - data port tests for mastercard.device
+Opening unit 1 (loads the driver: chip and bus reset, 2-3 s)
+DRIVER SYNC INFO  CF94 period 0 offset 0 (asynchronous)
+
+RESULT 1 ok, 0 failed, 0 skipped
+== done

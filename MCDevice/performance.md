@@ -652,6 +652,21 @@ The established default driver remains asynchronous. A private read-only
 status query records whether automatic negotiation actually became active;
 the test then runs the ordinary driver suite and explicitly resets to async.
 
+The v22 result is
+[`logs/mcdiag-36-sync-v22-auto.log`](logs/mcdiag-36-sync-v22-auto.log).
+The state machine worked exactly as intended: the unit reported period/offset
+0/0 before I/O, 8/8 after the first normal read, and 0/0 after the explicit
+reset. All ordinary API checks completed. Performance did not reproduce v20,
+however: rates were 5682, 1391 and 609 KiB/s with roughly 15 ms command
+latency. The 128/32 KiB results are back in the slow synchronous regime despite
+the same negotiated settings and mover binary.
+
+Automatic negotiation is therefore still unsuitable as the default. V23 uses
+the unchanged v22 driver and runs three back-to-back `devtest -bb` passes under
+one negotiation, querying sync state between passes. This will show whether
+the v20 result was a transient fast state, a benchmark anomaly, or a mode that
+can be entered repeatably without renegotiation.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately
