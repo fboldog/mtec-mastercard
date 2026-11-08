@@ -1,0 +1,21 @@
+; Dedicated production-driver test disk. The read-only baseline runs first;
+; only if it completes does the saved/write/readback/restore suite start.
+FailAt 21
+MakeDir RAM:T
+Assign T: RAM:T
+Echo "MasterCard production DMA test - automatic read and write suites."
+Echo "Taking over from the M-Tec ROM driver. Don't use the hard disk until you reboot."
+MCDiag TAKEOVER LOG RAM:mcdiag.log
+Type RAM:mcdiag.log >DF0:mcdiag.log
+Set u `MCDiag FINDUNIT`
+Echo "== devtest on unit $u" >>DF0:mcdiag.log
+devtest -p mastercard.device >>DF0:mcdiag.log
+devtest -g mastercard.device $u >>DF0:mcdiag.log
+devtest -t mastercard.device $u >>DF0:mcdiag.log
+devtest -bb mastercard.device $u >>DF0:mcdiag.log
+Echo "== done" >>DF0:mcdiag.log
+Echo "Read suite complete. Starting saved write/readback/restore checks."
+Execute S:write-test
+Echo "All automatic tests complete."
+Echo "Read log: DF0:mcdiag.log"
+Echo "Write log: DF0:mcdiag-write.log"

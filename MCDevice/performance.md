@@ -746,6 +746,14 @@ This validates the exact sync-stripped production driver on hardware. Removing
 the diagnostic-only negotiation/control code recovered ROM space without a
 measurable asynchronous compatibility, integrity or performance regression.
 
+`MCTest-production-rw-v27.adf` is the corresponding unattended comparison
+disk for target/backend experiments. Its dedicated `startup-read-write` first
+runs the v26 production read and benchmark sequence, then automatically runs
+the saved write/readback/restore suite. It retains separate `mcdiag.log` and
+`mcdiag-write.log` files on the floppy. The normal startup remains read-only so
+future general-purpose test images do not write to every detected disk merely
+by booting.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately
