@@ -699,6 +699,19 @@ explicit experimental build only; the production driver and ROM stay async.
 V25 is a final full asynchronous integrity/performance regression using the
 normal startup suite and the standard interrupt-driven driver.
 
+### Diagnostic-only sync build
+
+`MC_SYNC_DIAG` now separates the SDTR/private-control implementation from the
+production driver. Disk diagnostic variants build with `MC_SYNC_DIAG=1`; the
+production-equivalent disk driver and both ROM variants leave it clear. The
+interrupt-driven ROM blob shrank from 15188 to 13576 bytes, increasing free
+16 KiB ROM space from 684 to 2296 bytes. The stripped disk driver is 11080
+bytes versus 12684 bytes for the diagnostic IRQ driver. Normal asynchronous
+DMA, extended-count reads, error handling and the interrupt mover remain.
+
+V26 runs the full read-only startup regression with the stripped
+`mastercard-prod-irq.device`, matching the production ROM's sync feature set.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately
@@ -802,6 +815,10 @@ MC_CPU_MHZ=42 MC_FAST_POLLS=1680 MC_IRQ_ROUNDS=4 ./build.sh
 interrupt server before it returns. Both must be positive integers. The build
 script passes these settings to disk-loaded and ROM variants, and also preserves
 them when `DOCKER=...` is used.
+
+`MC_SYNC_DIAG=1` is intentionally used only by the disk diagnostic builds. ROM
+and `mastercard-prod-irq.device` compile out SDTR negotiation and automatic
+sync; `mastercard-sync-irq.device` remains an explicit research artifact.
 
 The clock value does not alter CF94 timing registers. Those continue to describe
 the card's 40 MHz SCSI-controller clock.

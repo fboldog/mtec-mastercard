@@ -51,6 +51,12 @@ static inline void NewList(struct List *l)
 #ifndef MC_AUTO_SYNC
 #define MC_AUTO_SYNC 0                 /* opt-in build until full boot testing */
 #endif
+#ifndef MC_SYNC_DIAG
+#define MC_SYNC_DIAG 0                 /* SDTR/private controls are test-only */
+#endif
+#if MC_AUTO_SYNC && !MC_SYNC_DIAG
+#error MC_AUTO_SYNC requires MC_SYNC_DIAG
+#endif
 #define MC_AUTO_SYNC_PERIOD 50         /* 5 MB/s SDTR factor */
 #define MC_AUTO_SYNC_OFFSET 8          /* validated bounded grouping */
 
@@ -195,7 +201,9 @@ struct Cmd {
 void esp_init(struct MC *mc);
 void esp_busreset(struct MC *mc);
 LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c);
+#if MC_SYNC_DIAG
 LONG esp_sync(struct MC *mc, UBYTE target, UBYTE lun, struct MCSyncReq *r);
+#endif
 void mc_delay(struct MC *mc, ULONG micros);
 LONG mc_irq(struct MC *mc __asm("a1"));
 

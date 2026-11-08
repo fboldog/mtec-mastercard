@@ -979,6 +979,7 @@ static LONG pad_phase(struct MC *mc, struct Cmd *c, int extended)
     return err ? err : chip_error(live);
 }
 
+#if MC_SYNC_DIAG
 static LONG sync_failed(struct MC *mc, struct MCSyncReq *r, UBYTE step, LONG err)
 {
     r->step = step;
@@ -1097,6 +1098,7 @@ LONG esp_sync(struct MC *mc, UBYTE target, UBYTE lun, struct MCSyncReq *r)
     r->seq = mc->iseq;
     return 0;
 }
+#endif
 
 LONG esp_exec(struct MC *mc, UBYTE target, UBYTE lun, struct Cmd *c)
 {

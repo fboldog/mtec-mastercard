@@ -417,6 +417,7 @@ static void diag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     ior->io_Actual = sizeof *d;
 }
 
+#if MC_SYNC_DIAG
 /* MCCMD_SYNC: MCDiag-only conservative SDTR negotiation. */
 static void syncdiag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
 {
@@ -450,6 +451,7 @@ static void syncdiag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     }
     ior->io_Actual = sizeof *r;
 }
+#endif
 
 #ifdef ROM_BUILD
 #include "boot.c"
@@ -499,9 +501,11 @@ static void perform(struct MC *mc, struct IOStdReq *ior)
     case MCCMD_DIAG:
         diag(mc, u, ior);
         break;
+#if MC_SYNC_DIAG
     case MCCMD_SYNC:
         syncdiag(mc, u, ior);
         break;
+#endif
     case TD_GETGEOMETRY:
         geometry(mc, u, ior);
         break;

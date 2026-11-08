@@ -31,18 +31,21 @@ fi
 if [ -n "$MC_IRQ_ROUNDS" ]; then
     TUNE_DEFS="$TUNE_DEFS -DMC_IRQ_ROUNDS=$MC_IRQ_ROUNDS"
 fi
-# Three variants of the same driver, all named mastercard.device inside:
-#   mastercard.device      moves data with interrupts off (polled), a little faster
-#   mastercard-irq.device  moves data in the INT2 server (-DIRQXFER), so higher
-#                          interrupts (audio, vertical blank, serial) keep running
-#   mastercard-sync-irq.device is the opt-in offset-8 auto-negotiation test
-for V in "mastercard.device:" "mastercard-irq.device:-DIRQXFER" \
-         "mastercard-sync-irq.device:-DIRQXFER -DMC_AUTO_SYNC=1"; do
+# Four disk variants, all named mastercard.device inside. Test variants retain
+# the private SDTR controls; production and ROM builds compile them out.
+#   mastercard.device          polled diagnostic comparison
+#   mastercard-irq.device      normal interrupt-driven diagnostic driver
+#   mastercard-sync-irq.device opt-in offset-8 auto-negotiation experiment
+#   mastercard-prod-irq.device stripped production-equivalent disk driver
+for V in "mastercard.device:-DMC_SYNC_DIAG=1" \
+         "mastercard-irq.device:-DIRQXFER -DMC_SYNC_DIAG=1" \
+         "mastercard-sync-irq.device:-DIRQXFER -DMC_SYNC_DIAG=1 -DMC_AUTO_SYNC=1" \
+         "mastercard-prod-irq.device:-DIRQXFER"; do
     m68k-amigaos-gcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
         -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-pointer-sign -Wno-array-bounds \
         -s $TUNE_DEFS ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o ${V%%:*} dev.c esp.c || exit 1
 done
-ls -l mastercard.device mastercard-irq.device mastercard-sync-irq.device
+ls -l mastercard.device mastercard-irq.device mastercard-sync-irq.device mastercard-prod-irq.device
 # The boot ROM, in both variants: rom/MCROM[-irq]-16k.bin for the emulator,
 # rom/MCROM[-irq]-27C512.bin for the EPROM. Only our own code is in them.
 for V in ":" "-irq:-DIRQXFER"; do
