@@ -518,25 +518,32 @@ At boot:
 
 **Boot menu:** holding the right mouse button at power-on opens it; both
 buttons stay Kickstart's own Early Startup menu. The driver first finds the
-devices and reads their RDBs, then shows them in a window: SCSI ID, vendor,
-product, revision, type and size for each device, and under each disk its
-partitions with drive name, file system type (`DOS\3`, `PFS\3`...), size and
-boot priority, or "not bootable" / "not mounted". Up to 16 partitions are listed. **Boot** (Return) continues; **Skip card this boot** (Esc) leaves the
-card's partitions unmounted for this boot only. The menu uses the system's own
-look: a screen like Workbench's, with the default 3D pens and the system font,
-and a GadTools window sized to its text, its list padding taken from the font's
-baseline so it stays centred in any font. Its title bar is Intuition's own and
-matches a Shell window's pixel for pixel. gadtools.library is in the Kickstart
-ROM, but ramlib only starts it once DOS runs, so the menu starts it itself with
+devices and reads their RDBs, then shows a table like CSA's: each device (SCSI
+ID, vendor and product, type, size), followed by its partitions (drive name,
+file system type such as `DOS\3` or `PFS\3`, boot priority, size), with `*` or
+`-` in the Mount and Boot columns. Up to 16 partitions are listed. **Boot**
+(Return) continues; **Skip card this boot** (Esc) leaves the card's partitions
+unmounted for this boot only.
+
+The menu uses the system's own look: a screen like Workbench's, with the
+default 3D pens and the system font, and a GadTools window. Each table cell is
+drawn at its own column, so the columns line up in any font, and the padding
+comes from the font's baseline. The title bar is Intuition's own and matches a
+Shell window's pixel for pixel. gadtools.library is in the Kickstart ROM, but
+ramlib only starts it once DOS runs, so the menu starts it itself with
 `FindResident` and `InitResident`. If anything fails to open, the boot just
 continues.
 
 The ROM build leaves out MCDiag's private command and its comparison modes
 (`MC_DIAG_MODES=0`): the normal driver only uses DMA16 and the automatic
 extended count, and an interrupt ROM moves all data in the server. That saved
-about 2.3 KB. With the menu and its partition list, the interrupt ROM leaves
-472 bytes free and the polled one 568. The disk drivers keep everything; the production one is
-byte-identical to the validated build.
+about 2.3 KB. The relocation table uses 16-bit offsets, saving about 300 bytes
+more. `build.sh` compiles the ROM with GCC 16.2 from the
+`stefanreinauer/amiga-gcc:gcc-v16.2` container when Docker runs; `ROM_GCC=`
+builds it with the local toolchain. With the local GCC 15.2 the interrupt ROM
+leaves 230 bytes free and the polled one 324. The disk drivers keep everything
+and the local toolchain; the production one is byte-identical to the validated
+build.
 
 Tested in Amiberry with Kickstart 3.1, from the ROM alone, no floppy:
 - **Booting:** from an FFS partition at 2.5-3.5 GB, with FFS 46 loaded from the
