@@ -1,0 +1,21 @@
+; Read-only responsiveness experiment: production driver built with the
+; ready-entry first-gap mode (MC_IRQ_ROUNDS=0). Validate before measuring it.
+FailAt 21
+MakeDir RAM:T
+Assign T: RAM:T
+Echo "MCDevice IRQ first-gap integrity test (read-only)."
+MCDiag TAKEOVER LOG RAM:mcdiag-r0.log
+Type RAM:mcdiag-r0.log >DF0:mcdiag-r0.log
+Echo "Measuring calibrated background CPU availability."
+MCCpuBench DEVICE mastercard.device UNIT 1 SECONDS 3 READSIZE 524288 LOG RAM:cpu-mc-r0.log
+Type RAM:cpu-mc-r0.log >DF0:cpu-mc-r0.log
+Echo "Measuring ordinary throughput without the worker."
+Echo "== IRQ first-gap, devtest pass 1" >RAM:devtest-r0.log
+devtest -bb mastercard.device 1 >>RAM:devtest-r0.log
+Echo "== IRQ first-gap, devtest pass 2" >>RAM:devtest-r0.log
+devtest -bb mastercard.device 1 >>RAM:devtest-r0.log
+Echo "== IRQ first-gap, devtest pass 3" >>RAM:devtest-r0.log
+devtest -bb mastercard.device 1 >>RAM:devtest-r0.log
+Echo "== done" >>RAM:devtest-r0.log
+Type RAM:devtest-r0.log >DF0:devtest-r0.log
+Echo "Done: DF0:mcdiag-r0.log, cpu-mc-r0.log and devtest-r0.log"

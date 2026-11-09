@@ -38,8 +38,8 @@ void *memset(void *d, int c, unsigned long n);
 #if MC_FAST_POLLS < 1
 #error MC_FAST_POLLS must be a positive integer
 #endif
-#if MC_IRQ_ROUNDS < 1
-#error MC_IRQ_ROUNDS must be a positive integer
+#if MC_IRQ_ROUNDS < 0
+#error MC_IRQ_ROUNDS must be zero or a positive integer
 #endif
 
 static inline void wr(struct MC *mc, int n, UBYTE v) { REG(mc, n) = v; }
@@ -209,6 +209,11 @@ void fast32_in(struct Fast *f __asm("a0"));     /* MCMODE_DMA32: 32 bytes per fl
 void movem16_in(struct Fast *f __asm("a0"));    /* MCMODE_MOVEM: two movem.l per flag */
 void rom16_in(struct Fast *f __asm("a0"));      /* original ROM: CF94 count is the bound */
 void rom16_in_ready(struct Fast *f __asm("a0"));
+#if MC_IRQ_ROUNDS == 0
+#define MC_ZERO_LIMIT_EXIT "tst.l d1\n  beq.s 9f\n  "
+#else
+#define MC_ZERO_LIMIT_EXIT ""
+#endif
 __asm(
 "  .text\n"
 "  .globl _fast16_in_ready\n"
@@ -230,7 +235,7 @@ __asm(
 "  move.l 20(a0),d1\n"
 "  tst.l d0\n"
 "  beq.s 9f\n"
-"  1:move.l d1,d2\n"
+"  1:" MC_ZERO_LIMIT_EXIT "move.l d1,d2\n"
 "  2:tst.b (a2)\n"
 "  bmi.s 3f\n"
 "  tst.b (a2)\n"
@@ -287,7 +292,7 @@ __asm(
 "  move.l 20(a0),d1\n"
 "  tst.l d0\n"
 "  beq.s 9f\n"
-"  1:move.l d1,d2\n"
+"  1:" MC_ZERO_LIMIT_EXIT "move.l d1,d2\n"
 "  2:tst.b (a2)\n"
 "  bmi.s 3f\n"
 "  tst.b (a2)\n"
@@ -334,7 +339,7 @@ __asm(
 "  move.l 20(a0),d1\n"
 "  tst.l d0\n"
 "  beq.s 9f\n"
-"  1:move.l d1,d2\n"
+"  1:" MC_ZERO_LIMIT_EXIT "move.l d1,d2\n"
 "  2:tst.b (a2)\n"
 "  bmi.s 3f\n"
 "  tst.b (a2)\n"
@@ -385,7 +390,7 @@ __asm(
 "  move.l 20(a0),d1\n"
 "  tst.l d0\n"
 "  beq.s 9f\n"
-"  1:move.l d1,d2\n"
+"  1:" MC_ZERO_LIMIT_EXIT "move.l d1,d2\n"
 "  2:tst.b (a2)\n"
 "  bmi.s 3f\n"
 "  tst.b (a2)\n"
@@ -436,7 +441,7 @@ __asm(
 "  movem.l (a0),a2-a4\n"
 "  movea.l 16(a0),a5\n"
 "  move.l 20(a0),d1\n"
-"  1:move.l d1,d2\n"
+"  1:" MC_ZERO_LIMIT_EXIT "move.l d1,d2\n"
 "  2:tst.b (a2)\n"
 "  bmi.s 3f\n"
 "  tst.b (a2)\n"
@@ -472,6 +477,7 @@ __asm(
 "  movem.l (sp)+,d2/a2-a5\n"
 "  rts\n"
 );
+#undef MC_ZERO_LIMIT_EXIT
 
 /* The NCR 53CF94-2 requires DMA NOP before loading the three-byte counter.
    esp_exec keeps ENF set for the complete experimental command so ordinary
@@ -527,7 +533,9 @@ static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
         f.buf = x->p;
         f.bursts = x->left >> 4;
         f.stat = &REG(mc, R_STAT);
-        f.limit = MC_IRQ_ROUNDS;        /* rounds of 8 flag tests before leaving */
+        /* Zero is a ready-entry-only mode: consume continuous DREQ, then
+           return on its first clear sample instead of bridging a refill gap. */
+        f.limit = MC_IRQ_ROUNDS;        /* otherwise, rounds of 8 flag tests */
         f.status = 0;
         if (x->in && x->rom)
             rom16_in_ready(&f);

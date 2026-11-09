@@ -40,7 +40,7 @@ experiments.
 | Parameter | Baseline | Sweep |
 |---|---:|---:|
 | `MC_FAST_POLLS` | 3360 | 512, 1024, 1680, 2520, 3360 |
-| `MC_IRQ_ROUNDS` | 4 | 1, 2, 4, 8 |
+| `MC_IRQ_ROUNDS` | 4 | 0, 1, 2, 4, 8 |
 | IRQ DMA phase | 64 KiB | MCDiag `EXT24`: 128, 256 and 512 KiB |
 | Small-transfer mode | IRQ | IRQ or polled below 4, 8 and 16 KiB |
 | Board transfer | DMA16 | DMA16 |
@@ -960,6 +960,17 @@ consume data while DREQ remains continuously asserted, but return immediately
 at its first clear sample. That requires an explicit assembly exit for zero;
 using the current decrement loop with zero would underflow and spin.
 
+`MCTest-cpu-irq-round0-v31.adf` implements that experiment. With
+`MC_IRQ_ROUNDS=0`, the interrupt mover may enter only after C has already seen
+DREQ asserted. It consumes the continuous ready burst, then exits at the first
+clear DREQ sample instead of executing another eight-test refill-polling round.
+The normal default remains 4 and compiles to the same production driver and ROM
+bytes as before. The v31 floppy runs the same read-only integrity,
+CPU-availability and three-pass throughput sequence as v30, saving
+`mcdiag-r0.log`, `cpu-mc-r0.log` and `devtest-r0.log` on DF0. Its SHA-1 is
+`673c1e8397a8aab981dd62833c4f379db10a7938`; its embedded first-gap driver is
+`c64b393673575efc0403325b4b2df1f1add0ae43`.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether
@@ -999,9 +1010,10 @@ MC_CPU_MHZ=42 MC_FAST_POLLS=1680 MC_IRQ_ROUNDS=4 ./build.sh
 
 `MC_FAST_POLLS` is the task-context wait before using timer.device.
 `MC_IRQ_ROUNDS` is the number of eight-test DREQ polling rounds retained by the
-interrupt server before it returns. Both must be positive integers. The build
-script passes these settings to disk-loaded and ROM variants, and also preserves
-them when `DOCKER=...` is used.
+interrupt server before it returns. `MC_FAST_POLLS` must be positive. Normally
+`MC_IRQ_ROUNDS` is positive too; zero selects the experimental ready-entry
+first-gap return described above. The build script passes these settings to
+disk-loaded and ROM variants, and also preserves them when `DOCKER=...` is used.
 
 `MC_SYNC_DIAG=1` is intentionally used only by the disk diagnostic builds. ROM
 and `mastercard-prod-irq.device` compile out SDTR negotiation and automatic
