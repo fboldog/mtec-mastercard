@@ -465,6 +465,12 @@ disk reads. Hardware interrupt time necessarily reduces completed work, without
 depending on Exec task-switch hooks. The v29 CPU-availability test disk runs it
 against the original and production drivers in one boot.
 
+On the real card under continuous 512 KiB reads, the original driver left 8.0%
+of calibrated low-priority computation available at 6127 KiB/s. MCDevice left
+0.0% at 6538 KiB/s. Thus the original is somewhat more task-friendly, but its
+1-19% `devtest` load was not genuine CPU use: about 92% was unavailable. See
+[`performance.md`](MCDevice/performance.md) for the method and full logs.
+
 devtest's 8 KB latency on the BlueSCSI reads 2.09 ms polled and 3.02 ms with
 interrupts, but MCDiag's per-command times differ by only tens of
 microseconds. All of devtest's latencies on this drive sit near whole

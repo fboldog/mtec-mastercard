@@ -905,6 +905,34 @@ saved as `DF0:cpu-mtec.log` and `DF0:cpu-mcdevice.log`. Each driver gets its own
 three-second idle calibration and three loaded intervals, normalized by exact
 EClock duration rather than command count or task-switch hooks.
 
+The hardware results are
+[`logs/cpu-46-original-rom-v29.log`](logs/cpu-46-original-rom-v29.log) and
+[`logs/cpu-47-production-v29.log`](logs/cpu-47-production-v29.log).
+Both calibrations ran at the same 709379 Hz EClock with the same memory type;
+the idle worker rates differed by only 0.08% (3946 versus 3949 units/ms).
+
+| Driver under continuous 512 KiB reads | Loaded throughput | Real background application CPU available | CPU unavailable |
+|---|---:|---:|---:|
+| Original `mtecscsi.device` 2.3 | 6127 KiB/s | 8.0% | 92.0% |
+| Production `mastercard.device` 0.1 | 6538 KiB/s | 0.0% | 100.0% |
+
+The original's three availability samples were 7.7%, 8.0% and 8.3%, while
+MCDevice's worker completed zero iterations in every loaded interval. This
+confirms that the original driver's 1-19% `devtest` load did not represent
+81-99% spare CPU: only about 8% of calibrated low-priority computation actually
+ran. MCDevice is 6.7% faster in this concurrent test but currently gives no
+task-level background time during a stream of large reads. Higher-priority
+interrupts remain responsive, as the VBlank measurements established; that is
+separate from application-task availability.
+
+The likely MCDevice cause is its intentionally persistent INT2 mover. A 512
+KiB phase can remain inside the level-2 handler across short target refill gaps,
+then wake the priority-10 driver task and requester without ever scheduling the
+priority -10 worker. `MC_IRQ_ROUNDS` is the bounded tuning point for a follow-up:
+reducing it may expose refill gaps to tasks, but only hardware measurement can
+show whether the board deasserts INT2 long enough to schedule them and what
+throughput it costs.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether
