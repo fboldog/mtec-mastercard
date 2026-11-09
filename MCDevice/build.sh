@@ -61,4 +61,11 @@ python3 ../MTecPatch/gen/genstubs.py "$N" \
 m68k-amigaos-gcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
     -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-pointer-sign -Wno-array-bounds \
     -I. -I../MTecPatch/gen -I"$N/Include_H" -o MCDiag MCDiag.c || exit 1
-ls -l MCDiag
+python3 ../MTecPatch/gen/genstubs.py "$N" \
+    exec=SysBase:FindTask,AllocMem,FreeMem,AllocSignal,FreeSignal,SetSignal,Signal,Wait,AddTask,RemTask,OpenLibrary,CloseLibrary,OpenDevice,CloseDevice,DoIO,TypeOfMem \
+    dos=DOSBase:Open,Close,VPrintf,VFPrintf,Flush,ReadArgs,FreeArgs,PrintFault,IoErr,Delay \
+    timer=TimerBase:ReadEClock > gen/cpustubs.h || exit 1
+m68k-amigaos-gcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
+    -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-array-bounds \
+    -I. -I../MTecPatch/gen -I"$N/Include_H" -o MCCpuBench MCCpuBench.c || exit 1
+ls -l MCDiag MCCpuBench

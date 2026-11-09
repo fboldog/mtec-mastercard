@@ -1,0 +1,14 @@
+; Compare real low-priority application progress under the original ROM driver
+; and the production MCDevice driver on the same target in one boot.
+FailAt 21
+MakeDir RAM:T
+Assign T: RAM:T
+Echo "Measuring original mtecscsi.device CPU availability (read-only)."
+MCCpuBench DEVICE mtecscsi.device UNIT 1 SECONDS 3 READSIZE 524288 LOG RAM:cpu-mtec.log
+Type RAM:cpu-mtec.log >DF0:cpu-mtec.log
+Echo "Replacing the original driver with production MCDevice."
+MCDiag TAKEOVER LOADONLY
+Echo "Measuring production mastercard.device CPU availability (read-only)."
+MCCpuBench DEVICE mastercard.device UNIT 1 SECONDS 3 READSIZE 524288 LOG RAM:cpu-mcdevice.log
+Type RAM:cpu-mcdevice.log >DF0:cpu-mcdevice.log
+Echo "Done. Results: DF0:cpu-mtec.log and DF0:cpu-mcdevice.log"

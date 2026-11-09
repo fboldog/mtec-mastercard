@@ -889,6 +889,22 @@ READ CAPACITY sees all 12582912 sectors, but normal device I/O cannot expose
 them. MCDevice is slightly slower but provides the full medium and modern
 device APIs.
 
+`MCCpuBench` supplies the independent progress measurement. A priority -10
+worker executes a dependency-chained register loop and publishes its completed
+work every 64 iterations. The program first calibrates that work during an idle
+EClock interval, then repeats the same wall-clock interval while issuing
+continuous 512 KiB reads. Interrupt handlers stop the worker's instructions
+even when Exec still considers that task scheduled, so loaded progress divided
+by idle progress measures actual background-application CPU availability.
+Read throughput is measured at the same time.
+
+`MCTest-cpu-availability-v29.adf` runs the read-only benchmark three times on
+the original `mtecscsi.device`, performs the established takeover, and repeats
+it on the production `mastercard.device` during the same boot. The results are
+saved as `DF0:cpu-mtec.log` and `DF0:cpu-mcdevice.log`. Each driver gets its own
+three-second idle calibration and three loaded intervals, normalized by exact
+EClock duration rather than command count or task-switch hooks.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether

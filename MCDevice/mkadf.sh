@@ -11,7 +11,7 @@ STARTUP=${STARTUP:-disk/startup-sequence}
 rm -f "$A"
 xdftool "$A" format MCTEST ffs + boot install + makedir C + makedir S + makedir Devs \
     + write "$STARTUP" S/Startup-Sequence + write disk/write-test S/write-test + write disk/sync-test S/sync-test + write disk/sync-write-test S/sync-write-test + write disk/sync-write-offset8-test S/sync-write-offset8-test + write disk/sync-fast-test S/sync-fast-test + write disk/sync-driver-test S/sync-driver-test + write disk/sync-driver-offset8-test S/sync-driver-offset8-test + write disk/sync-offset15-repeat S/sync-offset15-repeat + write disk/auto-sync-driver-test S/auto-sync-driver-test + write disk/auto-sync-repeat-test S/auto-sync-repeat-test + write disk/sync-offset-test S/sync-offset-test + write disk/mtec-speed S/mtec-speed \
-    + write ${DRIVER:-mastercard.device} Devs/mastercard.device + write MCDiag C/MCDiag \
+    + write ${DRIVER:-mastercard.device} Devs/mastercard.device + write MCDiag C/MCDiag + write MCCpuBench C/MCCpuBench \
     + write ../MTecDump/More C/More + write $S/dt/devtest_1.9/devtest C/devtest >/dev/null || exit 1
 for c in Echo Execute Wait Type Version Info Dir Assign MakeDir; do
     xdftool "$A" write $I/c/$c C/$c >/dev/null || exit 1

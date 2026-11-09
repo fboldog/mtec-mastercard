@@ -459,6 +459,12 @@ This explains why M-Tec's driver reports 13% despite executing essentially the
 same CPU copy loop. The percentage is useful for task availability, but cannot
 compare the true copy cost of two interrupt-driven drivers.
 
+`MCDevice/MCCpuBench.c` measures this independently: a low-priority task runs
+calibrated register-only work during an idle interval and during continuous
+disk reads. Hardware interrupt time necessarily reduces completed work, without
+depending on Exec task-switch hooks. The v29 CPU-availability test disk runs it
+against the original and production drivers in one boot.
+
 devtest's 8 KB latency on the BlueSCSI reads 2.09 ms polled and 3.02 ms with
 interrupts, but MCDiag's per-command times differ by only tens of
 microseconds. All of devtest's latencies on this drive sit near whole
