@@ -990,6 +990,17 @@ the same level-2 handler must keep draining the port. It merely replaces the
 fast longword loop with the slow word path. `MC_IRQ_ROUNDS=0` is rejected for
 production, and 1 is already the minimum useful setting.
 
+`MCTest-cpu-fastpoll1-v32.adf` tests the remaining task-context wait boundary.
+It restores the normal `MC_IRQ_ROUNDS=4`, but builds with `MC_FAST_POLLS=1` so
+selection, command and status waits sleep through timer.device almost
+immediately instead of spinning for roughly one millisecond. This is the
+maximum-sleep endpoint: if it exposes useful background CPU, intermediate poll
+counts can trade some of that gain back for throughput; if it does not, a poll
+count sweep cannot solve the continuous-read result. The test is read-only and
+saves `mcdiag-fp1.log`, `cpu-mc-fp1.log` and `devtest-fp1.log` on DF0. Its
+SHA-1 is `334d94d58b37fde45cd35d64086e1307c6d5f115`; its embedded driver is
+`6f43fc673ec5950680b3f038e998b85f28427da6`.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether

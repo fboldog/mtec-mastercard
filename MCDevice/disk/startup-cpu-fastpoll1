@@ -1,0 +1,21 @@
+; Read-only responsiveness experiment: retain normal IRQ refill polling but
+; sleep after one task-context status poll (MC_FAST_POLLS=1).
+FailAt 21
+MakeDir RAM:T
+Assign T: RAM:T
+Echo "MCDevice FAST_POLLS=1 integrity test (read-only)."
+MCDiag TAKEOVER LOG RAM:mcdiag-fp1.log
+Type RAM:mcdiag-fp1.log >DF0:mcdiag-fp1.log
+Echo "Measuring calibrated background CPU availability."
+MCCpuBench DEVICE mastercard.device UNIT 1 SECONDS 3 READSIZE 524288 LOG RAM:cpu-mc-fp1.log
+Type RAM:cpu-mc-fp1.log >DF0:cpu-mc-fp1.log
+Echo "Measuring ordinary throughput without the worker."
+Echo "== FAST_POLLS 1, devtest pass 1" >RAM:devtest-fp1.log
+devtest -bb mastercard.device 1 >>RAM:devtest-fp1.log
+Echo "== FAST_POLLS 1, devtest pass 2" >>RAM:devtest-fp1.log
+devtest -bb mastercard.device 1 >>RAM:devtest-fp1.log
+Echo "== FAST_POLLS 1, devtest pass 3" >>RAM:devtest-fp1.log
+devtest -bb mastercard.device 1 >>RAM:devtest-fp1.log
+Echo "== done" >>RAM:devtest-fp1.log
+Type RAM:devtest-fp1.log >DF0:devtest-fp1.log
+Echo "Done: DF0:mcdiag-fp1.log, cpu-mc-fp1.log and devtest-fp1.log"
