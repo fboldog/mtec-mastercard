@@ -971,6 +971,25 @@ CPU-availability and three-pass throughput sequence as v30, saving
 `673c1e8397a8aab981dd62833c4f379db10a7938`; its embedded first-gap driver is
 `c64b393673575efc0403325b4b2df1f1add0ae43`.
 
+The v31 hardware results are
+[`logs/mcdiag-51-irq-round0-v31.log`](logs/mcdiag-51-irq-round0-v31.log),
+[`logs/cpu-52-irq-round0-v31.log`](logs/cpu-52-irq-round0-v31.log) and
+[`logs/devtest-53-irq-round0-v31.log`](logs/devtest-53-irq-round0-v31.log).
+Integrity remained clean at 84/0/1, but all three calibrated passes again gave
+0.0% background application CPU. Loaded throughput fell to 5436 KiB/s, 16.9%
+below the normal rounds=4 driver. Ordinary three-pass averages were 5619, 698
+and 467 KiB/s for 512, 128 and 32 KiB requests. Relative to rounds=1 those are
+15.9%, 88.9% and 90.8% slower.
+
+The transfer counters identify the failure mode. A normal rounds=1 64 KiB
+DMA16 command used all 4096 16-byte bursts and no word fallback. In first-gap
+mode the assembly mover completed only one or two bursts; the C tail then moved
+32752--32760 words because `$D039` remained ready after `$C039` cleared. Thus
+the first `$C039` gap is not an idle board interval and cannot expose task CPU:
+the same level-2 handler must keep draining the port. It merely replaces the
+fast longword loop with the slow word path. `MC_IRQ_ROUNDS=0` is rejected for
+production, and 1 is already the minimum useful setting.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether

@@ -1,0 +1,64 @@
+== IRQ first-gap, devtest pass 1
+Test mastercard.device 1 with Zorro II RAM
+read  512 KB xfers          5709 KB/sec (100% CPU)
+read  128 KB xfers           712 KB/sec (100% CPU)
+read   32 KB xfers           467 KB/sec (100% CPU)
+OpenDevice / CloseDevice    0.018 ms
+OpenDevice multiple         0.013 ms
+CloseDevice multiple        0.002 ms
+TD_GETGEOMETRY sequential   2.082 ms
+TD_GETGEOMETRY parallel     2.083 ms
+TD_CHANGENUM                0.005 ms 
+TD_CHANGENUM quick          0.002 ms 
+CMD_INVALID                 0.023 ms 
+CMD_START                   1.019 ms 
+CMD_READ butterfly average  0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly far      0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly constant 0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ sequential         18.079 ms 
+CMD_READ parallel           18.079 ms
+HD_SCSICMD read sequential  18.077 ms
+HD_SCSICMD read parallel    18.080 ms
+== IRQ first-gap, devtest pass 2
+Test mastercard.device 1 with Zorro II RAM
+read  512 KB xfers          5743 KB/sec (100% CPU)
+read  128 KB xfers           712 KB/sec (100% CPU)
+read   32 KB xfers           467 KB/sec (100% CPU)
+OpenDevice / CloseDevice    0.018 ms
+OpenDevice multiple         0.010 ms
+CloseDevice multiple        0.002 ms
+TD_GETGEOMETRY sequential   2.082 ms
+TD_GETGEOMETRY parallel     2.083 ms
+TD_CHANGENUM                0.005 ms 
+TD_CHANGENUM quick          0.001 ms 
+CMD_INVALID                 0.023 ms 
+CMD_START                   1.019 ms 
+CMD_READ butterfly average  0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly far      0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly constant 0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ sequential         18.079 ms 
+CMD_READ parallel           18.079 ms
+HD_SCSICMD read sequential  18.077 ms
+HD_SCSICMD read parallel    18.079 ms
+== IRQ first-gap, devtest pass 3
+Test mastercard.device 1 with Zorro II RAM
+read  512 KB xfers          5404 KB/sec (100% CPU)
+read  128 KB xfers           671 KB/sec (100% CPU)
+read   32 KB xfers           467 KB/sec (100% CPU)
+OpenDevice / CloseDevice    0.018 ms
+OpenDevice multiple         0.013 ms
+CloseDevice multiple        0.002 ms
+TD_GETGEOMETRY sequential   2.082 ms
+TD_GETGEOMETRY parallel     2.083 ms
+TD_CHANGENUM                0.005 ms 
+TD_CHANGENUM quick          0.001 ms 
+CMD_INVALID                 0.023 ms 
+CMD_START                   1.019 ms 
+CMD_READ butterfly average  0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly far      0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly constant 0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ sequential         18.079 ms 
+CMD_READ parallel           18.080 ms
+HD_SCSICMD read sequential  18.078 ms
+HD_SCSICMD read parallel    18.079 ms
+== done

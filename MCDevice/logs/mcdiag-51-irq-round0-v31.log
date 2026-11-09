@@ -1,0 +1,129 @@
+MCDiag 0.1 - data port tests for mastercard.device
+TAKEOVER: process frozen, interrupt server removed, device renamed to mtecscsi.off
+TAKEOVER: chip reset, 0 words drained from the board
+Opening unit 0 (loads the driver: chip and bus reset, 2-3 s)
+Opening unit 1
+Unit 1 open, INQUIRY with DMA16
+
+== Unit 1: type 0  QUANTUM  BlueSCSI Pico    1.0 
+-- INQUIRY 36
+INQUIRY 36         DMA16 ok      36/36    s00 b2 l0 w2 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t846us
+INQUIRY 36         DMA8  same    36/36    s00 b4 l0 w2 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t771us
+INQUIRY 36         WORD  same    36/36    s00 b0 l0 w18 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t806us
+INQUIRY 36         PIO   same    36/36    s00 b0 l0 w0 f36 c36 q0 p0 tc0 [00 00 00] st93>93 in10 sqC4 ff01 d0 x0 i0 z0 t3506us
+-- INQUIRY 37
+INQUIRY 37         DMA16 ok      37/37    s00 b2 l0 w3 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t851us
+INQUIRY 37         DMA8  same    37/37    s00 b4 l0 w3 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t771us
+INQUIRY 37         WORD  same    37/37    s00 b0 l0 w19 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t809us
+INQUIRY 37         PIO   same    37/37    s00 b0 l0 w0 f37 c37 q0 p0 tc0 [00 00 00] st93>93 in10 sqC4 ff01 d0 x0 i0 z0 t3586us
+-- INQUIRY 255
+INQUIRY 255        DMA16 ok     255/255   s00 b2 l0 w112 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t1304us
+INQUIRY 255        DMA8  same   255/255   s00 b31 l0 w4 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t866us
+INQUIRY 255        WORD  same   255/255   s00 b0 l0 w128 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t1135us
+INQUIRY 255        PIO   same   255/255   s00 b0 l0 w0 f255 c255 q0 p0 tc0 [00 00 00] st93>93 in10 sqC4 ff01 d0 x0 i0 z0 t20961us
+-- REQUEST SENSE 18
+REQUEST SENSE 18   DMA16 ok      18/18    s00 b1 l0 w1 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t839us
+-- MODE SENSE 255
+MODE SENSE 255     DMA16 ok     208/255   s00 b2 l0 w88 f0 c1 q0 p0 tc2F [39 39 39] st83>83 in10 sqC4 ff00 d0 x0 i1 z0 t1204us
+MODE SENSE 255     DMA8  same   208/255   s00 b26 l0 w0 f0 c1 q0 p0 tc2F [41 41 41] st83>83 in10 sqC4 ff00 d0 x0 i0 z0 t837us
+MODE SENSE 255     WORD  same   208/255   s00 b0 l0 w104 f0 c1 q0 p0 tc2F [41 41 41] st83>83 in10 sqC4 ff00 d0 x0 i0 z0 t1064us
+MODE SENSE 255     PIO   same   208/255   s00 b0 l0 w0 f208 c208 q0 p0 tc0 [00 00 00] st83>83 in10 sqC4 ff01 d0 x0 i0 z0 t17276us
+Medium: 12582912 blocks of 512 bytes
+-- READ 1
+READ 1             DMA16 ok     512/512   s00 b1 l0 w248 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i2 z0 t2495us
+READ 1             DMA8  same   512/512   s00 b64 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t1610us
+READ 1             WORD  same   512/512   s00 b0 l0 w256 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t1897us
+READ 1             PIO   same   512/512   s00 b0 l0 w0 f512 c512 q0 p0 tc0 [00 00 00] st93>93 in10 sqC4 ff01 d0 x0 i0 z0 t42510us
+-- READ 8
+READ 8             DMA16 ok    4096/4096  s00 b1 l0 w2040 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t9853us
+READ 8             DMA8  same  4096/4096  s00 b512 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t2774us
+READ 8             WORD  same  4096/4096  s00 b0 l0 w2048 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t7196us
+READ 8             PIO   same  4096/4096  s00 b0 l0 w0 f4096 c4096 q0 p0 tc0 [00 00 00] st93>93 in10 sqC4 ff01 d0 x0 i0 z0 t329705us
+-- READ 64K
+READ 64K           DMA16 ok   65536/65536 s00 b2 l0 w32752 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t46231us
+READ 64K           DMA8  same 65536/65536 s00 b8192 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t28131us
+READ 64K           WORD  same 65536/65536 s00 b0 l0 w32768 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t99376us
+-- READ 64K+1 block
+READ 64K+1 block   DMA16 ok   66048/66048 s00 b4 l0 w32992 f0 c2 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i2 z0 t139833us
+READ 64K+1 block   DMA8  same 66048/66048 s00 b8256 l0 w0 f0 c2 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t28448us
+READ 64K+1 block   WORD  same 66048/66048 s00 b0 l0 w33024 f0 c2 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t6901us
+-- READ last block
+READ last block    DMA16 ok     512/512   s00 b1 l0 w248 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t2283us
+READ last block    DMA8  same   512/512   s00 b64 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t1320us
+READ last block    WORD  same   512/512   s00 b0 l0 w256 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t1874us
+READ last block    PIO   same   512/512   s00 b0 l0 w0 f512 c512 q0 p0 tc0 [00 00 00] st93>93 in10 sqC4 ff01 d0 x0 i0 z0 t42425us
+-- READ 8 buf+1
+READ 8 buf+1       DMA16 ok    4096/4096  s00 b2 l0 w2032 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t9713us
+READ 8 buf+1       DMA8  same  4096/4096  s00 b512 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t3091us
+READ 8 buf+1       WORD  same  4096/4096  s00 b0 l0 w2048 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t7623us
+READ 8 buf+1       PIO   same  4096/4096  s00 b0 l0 w0 f4096 c4096 q0 p0 tc0 [00 00 00] st93>93 in10 sqC4 ff01 d0 x0 i0 z0 t329772us
+-- READ 8 buf+2
+READ 8 buf+2       DMA16 ok    4096/4096  s00 b2 l0 w2032 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t9598us
+READ 8 buf+2       DMA8  same  4096/4096  s00 b512 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t3088us
+READ 8 buf+2       WORD  same  4096/4096  s00 b0 l0 w2048 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t7427us
+READ 8 buf+2       PIO   same  4096/4096  s00 b0 l0 w0 f4096 c4096 q0 p0 tc0 [00 00 00] st93>93 in10 sqC4 ff01 d0 x0 i0 z0 t330029us
+-- READ 8 buf+3
+READ 8 buf+3       DMA16 ok    4096/4096  s00 b2 l0 w2032 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t9823us
+READ 8 buf+3       DMA8  same  4096/4096  s00 b512 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t3090us
+READ 8 buf+3       WORD  same  4096/4096  s00 b0 l0 w2048 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t7404us
+READ 8 buf+3       PIO   same  4096/4096  s00 b0 l0 w0 f4096 c4096 q0 p0 tc0 [00 00 00] st93>93 in10 sqC4 ff01 d0 x0 i0 z0 t329847us
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b2 l0 w32752 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t46314us
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t28081us
+READ 64K spread    WORD  same 65536/65536 s00 b0 l0 w32768 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t99338us
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b1 l0 w32760 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t138778us
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t28148us
+READ 64K spread    WORD  same 65536/65536 s00 b0 l0 w32768 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t99040us
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b1 l0 w32760 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t139101us
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t28111us
+READ 64K spread    WORD  same 65536/65536 s00 b0 l0 w32768 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t99263us
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b1 l0 w32760 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t46379us
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t28325us
+READ 64K spread    WORD  same 65536/65536 s00 b0 l0 w32768 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t99369us
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b2 l0 w32752 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t138476us
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t28118us
+READ 64K spread    WORD  same 65536/65536 s00 b0 l0 w32768 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t99060us
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b2 l0 w32752 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t139063us
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t28157us
+READ 64K spread    WORD  same 65536/65536 s00 b0 l0 w32768 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t99057us
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b2 l0 w32752 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t46324us
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t28114us
+READ 64K spread    WORD  same 65536/65536 s00 b0 l0 w32768 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t99355us
+-- READ 64K spread
+READ 64K spread    DMA16 ok   65536/65536 s00 b1 l0 w32760 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t46406us
+READ 64K spread    DMA8  same 65536/65536 s00 b8192 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t28117us
+READ 64K spread    WORD  same 65536/65536 s00 b0 l0 w32768 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t6018us
+SPEED idle         VBlank gap max 20043 us
+SPEED 64K x16      DMA16 same 655 KB/s, 97626 us per 64 KB, VBlank gap max 1762742113 us b2 l0 w32752 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t139425us
+SPEED 64K x16      DMA8  same 1968 KB/s, 32525 us per 64 KB, VBlank gap max 34100 us b8192 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t27870us
+SPEED 64K x16      WORD  same 653 KB/s, 97939 us per 64 KB, VBlank gap max 115633 us b0 l0 w32768 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t99557us
+SPEED 64K x16      DMA32 same 4521 KB/s, 14163 us per 64 KB, VBlank gap max 23108 us b2048 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t9519us
+SPEED 64K x16      MOVEM same 4001 KB/s, 16000 us per 64 KB, VBlank gap max 23775 us b4096 l0 w0 f0 c1 q0 p0 tc0 [41 41 41] st93>93 in10 sqC4 ff00 d0 x0 i0 z0 t11599us
+SPEED 64K x16      ROM16 same 655 KB/s, 97647 us per 64 KB, VBlank gap max 1762742113 us b1 l0 w32760 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t139478us
+PHASE  131072 B x4  DMA16 same 692 KB/s, VBlank gap max 1762742110 us b3 l0 w65512 f0 c2 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i2 z0 t185008us
+PHASE  131072 B x4  EXT24 same 1393 KB/s, VBlank gap max 1762742114 us b2 l0 w65520 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t92076us
+PHASE  262144 B x4  DMA16 same 696 KB/s, VBlank gap max 1762742113 us b5 l0 w131032 f0 c4 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i4 z0 t368244us
+PHASE  262144 B x4  EXT24 same 2878 KB/s, VBlank gap max 1762742114 us b2 l0 w131056 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t89004us
+PHASE  524288 B x4  DMA16 same 697 KB/s, VBlank gap max 1762742113 us b9 l0 w262072 f0 c8 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i8 z0 t734227us
+PHASE  524288 B x4  EXT24 same 6151 KB/s, VBlank gap max 1762742114 us b1 l0 w262136 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t83235us
+SPEED  512 B x64    DMA16 2842 us per command b1 l0 w248 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i2 z0 t2798us
+SPEED 8192 B x64    DMA16 18785 us per command b1 l0 w4088 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i1 z0 t18602us
+POST-EXT RCAP16    ok  32/32 s00 b1 l0 w8 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC1 ff00 d0 x0 i1 z0 t1042us
+WRITE/READ BUFFER  the drive's buffer is 65532 bytes
+BUFFER check       DMA16>DMA16 FAIL e0 w64/s00 r0/s02 len 64 @0 5A!=FE
+  write: b1 l0 w24 f0 c1 q0 p0 tc0 [39 39 39] st93>93 in10 sqC4 ff00 d0 x0 i2 z0 t894us
+  read:  b0 l0 w0 f0 c0 q0 p0 tc0 [00 00 00] st00>00 in00 sq00 ff00 d0 x0 i0 z0 t894us
+WRITE/READ BUFFER  skipped: the drive doesn't return what was written
+Opening unit 2
+Opening unit 3
+Opening unit 4
+Opening unit 5
+Opening unit 6
+
+RESULT 84 ok, 0 failed, 1 skipped
