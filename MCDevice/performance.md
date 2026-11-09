@@ -1027,6 +1027,32 @@ byte-identical production driver and ROM. The read-only v33 test saves
 `04dfba407b1c9f4c9c89e76e3f485ea6c1418951`; its embedded driver is
 `eee77ba688245a2fd0ea2f5b564bb902c3065202`.
 
+The v33 hardware results are
+[`logs/mcdiag-57-coop500-v33.log`](logs/mcdiag-57-coop500-v33.log),
+[`logs/cpu-58-coop500-v33.log`](logs/cpu-58-coop500-v33.log) and
+[`logs/devtest-59-coop500-v33.log`](logs/devtest-59-coop500-v33.log).
+Integrity remained clean at 84/0/1. All three calibrated passes reported 4.6%
+real background CPU, with an average 6209 KiB/s: exactly the intended balanced
+region and 5.0% below the unpaced production result. It is still 1.3% faster
+than the original ROM's 6127 KiB/s concurrent result, though the original
+provides 8.0% background time.
+
+Ordinary three-pass averages were 6372, 6077 and 4931 KiB/s for 512, 128 and
+32 KiB requests. Those are only 5.0%, 2.5% and 1.5% below the default, and
+direct-read latency stayed at about 3.01 ms. Accumulating small requests before
+sleeping avoided the severe 32 KiB regression seen with `MC_FAST_POLLS=1`.
+The tested profile comparison is therefore:
+
+| Continuous 512 KiB profile | Throughput | Real application CPU available | Decision |
+|---|---:|---:|---|
+| Production default | 6538 KiB/s | 0.0% | Maximum throughput |
+| `MC_FAST_POLLS=1` | 6493 KiB/s | 0.2% | Reject; negligible gain |
+| Cooperative 500 us/64 KiB | 6209 KiB/s | 4.6% | Best tested balanced profile |
+| Original `mtecscsi.device` 2.3 | 6127 KiB/s | 8.0% | More CPU time, legacy feature limits |
+
+The tested ADF including its returned logs has SHA-1
+`7c7d5b30a7a65f2a6571d365916907c071ed6890`.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether
