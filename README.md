@@ -540,8 +540,8 @@ extended count, and an interrupt ROM moves all data in the server. That saved
 about 2.3 KB. The relocation table uses 16-bit offsets, saving about 300 bytes
 more. `build.sh` compiles the ROM with GCC 16.2 from the
 `stefanreinauer/amiga-gcc:gcc-v16.2` container when Docker runs; `ROM_GCC=`
-builds it with the local toolchain. With the local GCC 15.2 the interrupt ROM
-leaves 230 bytes free and the polled one 324. The disk drivers keep everything
+builds it with the local toolchain. The interrupt ROM leaves 254 bytes free
+with GCC 16.2 (230 with the local GCC 15.2), and the polled one 380 (324). The disk drivers keep everything
 and the local toolchain; the production one is byte-identical to the validated
 build.
 
