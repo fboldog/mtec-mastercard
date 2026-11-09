@@ -1001,6 +1001,19 @@ saves `mcdiag-fp1.log`, `cpu-mc-fp1.log` and `devtest-fp1.log` on DF0. Its
 SHA-1 is `334d94d58b37fde45cd35d64086e1307c6d5f115`; its embedded driver is
 `6f43fc673ec5950680b3f038e998b85f28427da6`.
 
+The v32 results are
+[`logs/mcdiag-54-fastpoll1-v32.log`](logs/mcdiag-54-fastpoll1-v32.log),
+[`logs/cpu-55-fastpoll1-v32.log`](logs/cpu-55-fastpoll1-v32.log) and
+[`logs/devtest-56-fastpoll1-v32.log`](logs/devtest-56-fastpoll1-v32.log).
+Integrity remained clean at 84/0/1. Loaded throughput was 6493 KiB/s, only 0.7%
+below normal, but real background CPU availability was just 0.1--0.3% (0.2%
+average). The ordinary 512, 128 and 32 KiB averages were 6578, 5993 and 3319
+KiB/s: 1.9%, 3.9% and 33.7% below the default. The diagnostic sleep counter
+rose to three or more per command, confirming that the intended timer path ran.
+Immediate task-context sleep therefore cannot recover the original driver's
+8% background time, and intermediate `MC_FAST_POLLS` values would only trade
+away part of this already negligible 0.2% gain.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether
