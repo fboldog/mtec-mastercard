@@ -22,6 +22,12 @@ mkdir -p gen
 python3 ../MTecPatch/gen/genstubs.py "$N" \
     exec=SysBase:FindTask,Forbid,Permit,Disable,Enable,AllocMem,FreeMem,AllocSignal,Signal,Wait,SetSignal,WaitPort,GetMsg,PutMsg,ReplyMsg,AddTask,AddTail,AddHead,Remove,Cause,FindName,OpenLibrary,CloseLibrary,OpenDevice,DoIO,SendIO,CheckIO,WaitIO,AbortIO,AddIntServer,OpenResource,CacheClearU \
     expansion=ExpansionBase:FindConfigDev,MakeDosNode,AddBootNode > gen/stubs.h || exit 1
+python3 ../MTecPatch/gen/genstubs.py "$N" \
+    exec=SysBase:Wait,OpenLibrary,CloseLibrary,FindResident,InitResident \
+    intuition=IntuitionBase:OpenScreenTagList,CloseScreen,OpenWindowTagList,CloseWindow,GetScreenDrawInfo,FreeScreenDrawInfo \
+    graphics=GfxBase:SetAPen,Move,Text,TextLength \
+    gadtools=GadToolsBase:GetVisualInfoA,FreeVisualInfo,CreateContext,CreateGadgetA,FreeGadgets,GT_GetIMsg,GT_ReplyIMsg,GT_RefreshWindow,GT_BeginRefresh,GT_EndRefresh,DrawBevelBoxA \
+    > gen/bootstubs.h || exit 1
 # NewList is a macro in amiga.lib, which isn't linked.
 # MC_CPU_MHZ scales the default short task-context interrupt poll. The two
 # explicit values are useful for reproducible tuning builds.
@@ -55,7 +61,7 @@ ls -l mastercard.device mastercard-irq.device mastercard-sync-irq.device masterc
 for V in ":" "-irq:-DIRQXFER"; do
     m68k-amigaos-gcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
         -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-pointer-sign -Wno-array-bounds \
-        -DROM_BUILD $TUNE_DEFS ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o rom/driver${V%%:*}.hunk dev.c esp.c || exit 1
+        -DROM_BUILD -DMC_DIAG_MODES=0 $TUNE_DEFS ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o rom/driver${V%%:*}.hunk dev.c esp.c bootui.c || exit 1
     python3 rom/pack.py rom/driver${V%%:*}.hunk rom/diag.s rom/MCROM${V%%:*}-16k.bin rom/MCROM${V%%:*}-27C512.bin || exit 1
 done
 python3 ../MTecPatch/gen/genstubs.py "$N" \

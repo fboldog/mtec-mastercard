@@ -29,6 +29,9 @@ void *memset(void *d, int c, unsigned long n);
 #ifndef MC_CPU_MHZ
 #define MC_CPU_MHZ 42
 #endif
+#ifndef MC_DIAG_MODES
+#define MC_DIAG_MODES 1     /* MCDiag's transfer modes; the ROM build leaves them out */
+#endif
 #ifndef MC_FAST_POLLS
 #define MC_FAST_POLLS (80UL * MC_CPU_MHZ)
 #endif
@@ -330,6 +333,7 @@ __asm(
 "  move.l d0,12(a0)\n"
 "  movem.l (sp)+,d2/a2-a5\n"
 "  rts\n"
+#if MC_DIAG_MODES                        /* the MCDiag comparison loops */
 "  .globl _fast32_in\n"
 "  _fast32_in:\n"
 "  movem.l d2/a2-a5,-(sp)\n"
@@ -476,6 +480,7 @@ __asm(
 "  9:move.l a4,8(a0)\n"
 "  movem.l (sp)+,d2/a2-a5\n"
 "  rts\n"
+#endif
 );
 #undef MC_ZERO_LIMIT_EXIT
 
@@ -537,9 +542,12 @@ static ULONG irq_move(struct MC *mc, UBYTE *sampled_status)
            return on its first clear sample instead of bridging a refill gap. */
         f.limit = MC_IRQ_ROUNDS;        /* otherwise, rounds of 8 flag tests */
         f.status = 0;
+#if MC_DIAG_MODES
         if (x->in && x->rom)
             rom16_in_ready(&f);
-        else if (x->in)
+        else
+#endif
+        if (x->in)
             fast16_in_ready(&f);
         else
             fast16_out_ready(&f);
@@ -719,6 +727,7 @@ static LONG irq_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
 }
 #endif
 
+#if !defined(IRQXFER) || MC_DIAG_MODES   /* an IRQ ROM moves all data in the server */
 /* Moves one DMA chunk of a data phase. Runs disabled; ends at the chip's
    interrupt, whose registers it latches like mc_irq would.
    MCMODE_DMA16: 16 bytes each time $C039 says so, then words.
@@ -757,12 +766,14 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
         f.status = 0;
         if (!in)
             fast16_out(&f);
+#if MC_DIAG_MODES
         else if (c->mode == MCMODE_DMA32)
             fast32_in(&f);
         else if (c->mode == MCMODE_MOVEM)
             movem16_in(&f);
         else if (c->mode == MCMODE_ROM16)
             rom16_in(&f);
+#endif
         else
             fast16_in(&f);
         st_ = f.status;
@@ -885,7 +896,9 @@ static LONG dma_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     Enable();
     return chip_error(st_);
 }
+#endif
 
+#if MC_DIAG_MODES
 /* The data phase through the chip's FIFO, without DMA: Transfer Information
    moves what fits in the FIFO, the chip interrupts, the CPU empties or fills
    it, and again until the target changes phase. Interrupts stay on. */
@@ -938,18 +951,26 @@ static LONG pio_phase(struct MC *mc, struct Cmd *c, struct MCStats *st)
     return 0;
 }
 
+#endif
+
 static LONG data_phase(struct MC *mc, struct Cmd *c)
 {
     struct MCStats dummy, *st = c->st ? c->st : &dummy;
     if (c->actual >= c->len)
         return HFERR_Phase;             /* the target wants more than we have */
+#if MC_DIAG_MODES
     if (c->mode == MCMODE_PIO)
         return pio_phase(mc, c, st);
+#endif
 #ifdef IRQXFER
+#if MC_DIAG_MODES
     if (c->mode == MCMODE_DMA16 || c->mode == MCMODE_ROM16 || c->mode == MCMODE_EXT24)
+#endif
         return irq_phase(mc, c, st);    /* the other modes stay polled, for MCDiag */
 #endif
+#if !defined(IRQXFER) || MC_DIAG_MODES
     return dma_phase(mc, c, st);
+#endif
 }
 
 /* A target may remain in synchronous Data-In after the requested buffer is

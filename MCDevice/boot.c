@@ -309,6 +309,23 @@ static void add_partitions(struct MC *mc, struct MCUnit *u, struct FileSysResour
     }
 }
 
+/* MC_SCAN, in the task: probe every target on LUN 0 for the boot menu, and
+   remember the empty ones, so mounting doesn't wait for them again. */
+static void scan_all(struct MC *mc)
+{
+    UWORD t;
+    for (t = 0; t < MAX_TARGET; t++) {
+        struct IOStdReq pr;
+        if (t == OWN_ID || mc->units[t])
+            continue;
+        memset(&pr, 0, sizeof pr);
+        pr.io_Offset = t;
+        probe(mc, &pr);
+        if (!mc->units[t])
+            mc->absent |= 1 << t;
+    }
+}
+
 /* MC_MOUNT, in the task: every disk on LUN 0. */
 static void mount_all(struct MC *mc, struct IOStdReq *ior)
 {
@@ -329,7 +346,7 @@ static void mount_all(struct MC *mc, struct IOStdReq *ior)
         ULONG blk;
         if (t == OWN_ID)
             continue;
-        if (!mc->units[t]) {
+        if (!mc->units[t] && !(mc->absent & (1 << t))) {
             memset(&pr, 0, sizeof pr);
             pr.io_Offset = t;
             probe(mc, &pr);

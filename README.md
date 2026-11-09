@@ -516,8 +516,25 @@ At boot:
 5. **Booting:** BootPoint starts dos.library, which boots from the highest
    boot priority.
 
-The polled ROM's driver is 10,124 bytes in memory and leaves 5,396 bytes of the
-ROM free; the interrupt one leaves 4,316.
+**Boot menu:** holding the right mouse button at power-on opens it; both
+buttons stay Kickstart's own Early Startup menu. The driver first finds the
+devices, then shows them in a window: SCSI ID, vendor, product, revision, type
+and size. **Boot** (Return) continues; **Skip card this boot** (Esc) leaves the
+card's partitions unmounted for this boot only. The menu uses the system's own
+look: a screen like Workbench's, with the default 3D pens and the system font,
+and a GadTools window sized to its text, its list padding taken from the font's
+baseline so it stays centred in any font. Its title bar is Intuition's own and
+matches a Shell window's pixel for pixel. gadtools.library is in the Kickstart
+ROM, but ramlib only starts it once DOS runs, so the menu starts it itself with
+`FindResident` and `InitResident`. If anything fails to open, the boot just
+continues.
+
+The ROM build leaves out MCDiag's private command and its comparison modes
+(`MC_DIAG_MODES=0`): the normal driver only uses DMA16 and the automatic
+extended count, and an interrupt ROM moves all data in the server. That saved
+about 2.3 KB. With the menu, the interrupt ROM leaves 1,456 bytes free and the
+polled one 1,572. The disk drivers keep everything; the production one is
+byte-identical to the validated build.
 
 Tested in Amiberry with Kickstart 3.1, from the ROM alone, no floppy:
 - **Booting:** from an FFS partition at 2.5-3.5 GB, with FFS 46 loaded from the
@@ -526,7 +543,9 @@ Tested in Amiberry with Kickstart 3.1, from the ROM alone, no floppy:
   mounted read/write.
 - **Writing:** a file copied on the Amiga matches on the host.
 
-Both variants pass. The real card hasn't run it yet.
+Both variants pass, and the boot menu was tested with an always-open build:
+both disks listed, Return boots normally, Esc mounts nothing. The real card
+hasn't run the ROM yet.
 
 Not done yet:
 - the boot ROM on the real card

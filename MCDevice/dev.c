@@ -42,10 +42,14 @@ __asm("  .text\n  moveq #-1,d0\n  rts\n");
 #define MAX_XFER   0x100000UL   /* bytes per SCSI command; data phases are capped separately */
 #define MC_PROBE   0x7FF0       /* private: open a unit */
 #define MC_MOUNT   0x7FF2       /* private, ROM build: add the partitions at start-up */
+#define MC_SCAN    0x7FF3       /* private, ROM build: find the devices, for the boot menu */
 #define TRIES      3
 
 /* Optional balanced profile: deliberately leave task time between completed
    data requests. Zero compiles the pacing path out of production builds. */
+#ifndef MC_DIAG_MODES
+#define MC_DIAG_MODES 1     /* MCDiag's private command; the ROM build leaves it out */
+#endif
 #ifndef MC_COOP_US_PER_64K
 #define MC_COOP_US_PER_64K 0
 #endif
@@ -245,6 +249,13 @@ static void probe(struct MC *mc, struct IOStdReq *ior)
     u->lun = tmp.lun;
     u->type = inq[0] & 0x1F;
     u->removable = inq[1] >> 7;
+#ifdef ROM_BUILD
+    {
+        UWORD k;
+        for (k = 0; k < 28; k++)
+            u->ident[k] = inq[8 + k] >= ' ' && inq[8 + k] < 127 ? inq[8 + k] : ' ';
+    }
+#endif
     u->changes = 1;                     /* an ETD count of 0 is always out of date */
     NewList(&u->changeints);
     if (u->type == 0x00 || u->type == 0x07 || u->type == 0x0E)
@@ -395,6 +406,7 @@ static void unit_cmd(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior, UBYT
     ior->io_Error = scsi(mc, u, cdb, 6, 0, 0, 0, 0, 0);
 }
 
+#if MC_DIAG_MODES
 /* MCCMD_DIAG: one SCSI command in the chosen transfer mode, for MCDiag. */
 static void diag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
 {
@@ -425,6 +437,7 @@ static void diag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
     d->st.sleeps = mc->sleeps - s0;
     ior->io_Actual = sizeof *d;
 }
+#endif
 
 #if MC_SYNC_DIAG
 /* MCCMD_SYNC: MCDiag-only conservative SDTR negotiation. */
@@ -464,6 +477,8 @@ static void syncdiag(struct MC *mc, struct MCUnit *u, struct IOStdReq *ior)
 
 #ifdef ROM_BUILD
 #include "boot.c"
+int bootui_requested(void);
+int bootui_show(struct MC *mc);
 #endif
 
 static void perform(struct MC *mc, struct IOStdReq *ior)
@@ -479,6 +494,9 @@ static void perform(struct MC *mc, struct IOStdReq *ior)
 #ifdef ROM_BUILD
     case MC_MOUNT:
         mount_all(mc, ior);
+        break;
+    case MC_SCAN:
+        scan_all(mc);
         break;
 #endif
     case CMD_READ:
@@ -507,9 +525,11 @@ static void perform(struct MC *mc, struct IOStdReq *ior)
     case HD_SCSICMD:
         scsicmd(mc, u, ior);
         break;
+#if MC_DIAG_MODES
     case MCCMD_DIAG:
         diag(mc, u, ior);
         break;
+#endif
 #if MC_SYNC_DIAG
     case MCCMD_SYNC:
         syncdiag(mc, u, ior);
@@ -658,9 +678,37 @@ static int start_task(struct MC *mc)
 
 /* ---- device vectors ---- */
 
+#ifdef ROM_BUILD
+/* Sends a private command to the driver task and waits for it. */
+static void task_call(struct MC *mc, UWORD cmd, struct ConfigDev *cd)
+{
+    struct MsgPort mp;
+    struct IOStdReq mr;
+    memset(&mp, 0, sizeof mp);
+    mp.mp_Node.ln_Type = NT_MSGPORT;
+    mp.mp_Flags = PA_SIGNAL;
+    mp.mp_SigBit = SIGB_SINGLE;
+    mp.mp_SigTask = (struct Task *)FindTask(0);
+    NewList(&mp.mp_MsgList);
+    memset(&mr, 0, sizeof mr);
+    mr.io_Message.mn_ReplyPort = &mp;
+    mr.io_Message.mn_Length = sizeof mr;
+    mr.io_Device = (struct Device *)&mc->lib;
+    mr.io_Command = cmd;
+    mr.io_Data = cd;
+    SetSignal(0, SIGF_SINGLE);
+    PutMsg(mc->port, &mr.io_Message);
+    WaitPort(&mp);
+    GetMsg(&mp);
+}
+
+#endif
 static struct MC *dev_init(struct MC *mc __asm("d0"), BPTR seg __asm("a0"), struct ExecBase *sb __asm("a6"))
 {
     struct ConfigDev *cd;
+#ifdef ROM_BUILD
+    int show_bootui;
+#endif
 
     SysBase = sb;
     mc->lib.lib_Node.ln_Type = NT_DEVICE;
@@ -679,6 +727,9 @@ static struct MC *dev_init(struct MC *mc __asm("d0"), BPTR seg __asm("a0"), stru
     if (!cd || cd->cd_Driver || FindName(&SysBase->DeviceList, (STRPTR)"mtecscsi.device"))
         goto fail;
     mc->board = cd->cd_BoardAddr;
+#ifdef ROM_BUILD
+    show_bootui = bootui_requested();
+#endif
     if (!start_task(mc))
         goto fail;
     cd->cd_Driver = mc;
@@ -690,28 +741,11 @@ static struct MC *dev_init(struct MC *mc __asm("d0"), BPTR seg __asm("a0"), stru
     mc->irq.is_Code = mc_irq_entry;
     AddIntServer(INTB_PORTS, &mc->irq);
 #ifdef ROM_BUILD
-    {
-        /* Mount the partitions now, before dos.library starts booting. The
-           task does the SCSI work; this waits for it. */
-        struct MsgPort mp;
-        struct IOStdReq mr;
-        memset(&mp, 0, sizeof mp);
-        mp.mp_Node.ln_Type = NT_MSGPORT;
-        mp.mp_Flags = PA_SIGNAL;
-        mp.mp_SigBit = SIGB_SINGLE;
-        mp.mp_SigTask = (struct Task *)FindTask(0);
-        NewList(&mp.mp_MsgList);
-        memset(&mr, 0, sizeof mr);
-        mr.io_Message.mn_ReplyPort = &mp;
-        mr.io_Message.mn_Length = sizeof mr;
-        mr.io_Device = (struct Device *)&mc->lib;
-        mr.io_Command = MC_MOUNT;
-        mr.io_Data = cd;
-        SetSignal(0, SIGF_SINGLE);
-        PutMsg(mc->port, &mr.io_Message);
-        WaitPort(&mp);
-        GetMsg(&mp);
-    }
+    /* With right mouse held, scan first and show the boot menu; then mount
+       the partitions, before dos.library starts booting, unless the menu
+       said to skip the card this time. */
+    if (!show_bootui || (task_call(mc, MC_SCAN, cd), !bootui_show(mc)))
+        task_call(mc, MC_MOUNT, cd);
 #endif
     return mc;
 fail:

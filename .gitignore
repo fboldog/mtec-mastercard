@@ -34,3 +34,9 @@ MCDevice/gen/
 
 # Stray copy of a startup script, from a redirect to a file named "-"
 MTecPatch/-
+# Reference manuals and datasheets: copyrighted, kept locally only
+*.pdf
+*.epub
+docs/
+# Photos of the test screen
+MCDevice/*.jpg

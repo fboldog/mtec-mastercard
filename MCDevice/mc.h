@@ -149,6 +149,9 @@ struct MCUnit {
     ULONG changes;          /* TD_CHANGENUM */
     struct List changeints;
     struct Interrupt *remove;   /* TD_REMOVE's interrupt, or 0 */
+#ifdef ROM_BUILD
+    char ident[29];         /* vendor, product, revision from INQUIRY, for the boot menu */
+#endif
 };
 
 /* A data phase run by the interrupt server (IRQXFER builds). */
@@ -181,6 +184,9 @@ struct MC {
     ULONG stray;                /* board requests nobody was moving */
     ULONG sleeps;               /* waits that needed the timer */
     struct Xfer x;
+#ifdef ROM_BUILD
+    UBYTE absent;               /* targets the boot menu's scan found empty */
+#endif
 };
 
 /* One SCSI command, as esp_exec runs it. */
