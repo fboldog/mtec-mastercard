@@ -767,6 +767,16 @@ matching the raw/default v26 result. HDF backing therefore adds no measurable
 penalty on this card and SD-card setup. This becomes the control run for the
 same HDF with BlueSCSI TurboMax/Fast20 enabled.
 
+The matching BlueSCSI target log is
+[`MCTest-production-rw-v27-tested-log.txt`](MCTest-production-rw-v27-tested-log.txt).
+It identifies BlueSCSI 2026.08.17 on a Pico 2/W, the default 155 MHz system and
+26 MHz SDIO clocks, a Samsung 30 GB exFAT card, no `bluescsi.ini`, and one 6
+GiB 512-byte-sector image at ID 1. There is no image-fragmentation warning and
+no synchronous-negotiation message. Its single warning for a read at sector
+12582912 is expected from `devtest`'s read-to-capacity search: that is exactly
+one sector beyond the image's valid LBA range, and the resulting geometry still
+reports the correct 12582912-sector capacity.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately
