@@ -25,7 +25,7 @@ struct Device *TimerBase;
 LONG start(void);
 
 static const char vers[] __attribute__((used)) =
-    "$VER: MCCpuBench 0.1 (9.11.2026)";
+    "$VER: MCCpuBench 0.2 (9.11.2026)";
 
 #define WORK_STACK       4096
 #define DEFAULT_SECONDS  3
@@ -70,6 +70,40 @@ static void new_list(struct List *l)
     l->lh_Head = (struct Node *)&l->lh_Tail;
     l->lh_Tail = 0;
     l->lh_TailPred = (struct Node *)&l->lh_Head;
+}
+
+static int same_name(const char *a, const char *b)
+{
+    UBYTE x, y;
+    do {
+        x = *a++;
+        y = *b++;
+        if (x >= 'a' && x <= 'z') x -= 'a' - 'A';
+        if (y >= 'a' && y <= 'z') y -= 'a' - 'A';
+        if (x != y)
+            return 0;
+    } while (x);
+    return 1;
+}
+
+static int memory_type(const char *name, ULONG *flags, const char **canonical)
+{
+    if (!name || same_name(name, "PUBLIC")) {
+        *flags = MEMF_PUBLIC;
+        *canonical = "PUBLIC";
+    } else if (same_name(name, "FAST")) {
+        *flags = MEMF_PUBLIC | MEMF_FAST;
+        *canonical = "FAST";
+    } else if (same_name(name, "DMA24") || same_name(name, "24BITDMA")) {
+        *flags = MEMF_PUBLIC | MEMF_24BITDMA;
+        *canonical = "DMA24";
+    } else if (same_name(name, "CHIP")) {
+        *flags = MEMF_PUBLIC | MEMF_CHIP;
+        *canonical = "CHIP";
+    } else {
+        return 0;
+    }
+    return 1;
 }
 
 static ULONG now(void)
@@ -209,10 +243,10 @@ static LONG read_pass(struct IOStdReq *io, struct Worker *w, UBYTE *buf,
 LONG start(void)
 {
     LONG rc = RETURN_FAIL;
-    LONG args[5] = { 0, 0, 0, 0, 0 };
+    LONG args[6] = { 0, 0, 0, 0, 0, 0 };
     struct RDArgs *ra = 0;
-    const char *device;
-    ULONG unit, seconds, readsize;
+    const char *device, *memname;
+    ULONG unit, seconds, readsize, memflags;
     struct MsgPort port;
     struct IOStdReq io;
     struct timerequest treq;
@@ -228,7 +262,7 @@ LONG start(void)
     if (!DOSBase)
         return rc;
     ra = (struct RDArgs *)ReadArgs(
-        (STRPTR)"DEVICE/A,UNIT/N,SECONDS/N,READSIZE/N,LOG/K", args, 0);
+        (STRPTR)"DEVICE/A,UNIT/N,SECONDS/N,READSIZE/N,MEMTYPE/K,LOG/K", args, 0);
     if (!ra) {
         PrintFault(IoErr(), (STRPTR)"MCCpuBench");
         goto done;
@@ -237,15 +271,19 @@ LONG start(void)
     unit = args[1] ? *(LONG *)args[1] : 1;
     seconds = args[2] ? *(LONG *)args[2] : DEFAULT_SECONDS;
     readsize = args[3] ? (ULONG)*(LONG *)args[3] : DEFAULT_READ;
+    if (!memory_type((const char *)args[4], &memflags, &memname)) {
+        P("MEMTYPE must be PUBLIC, FAST, DMA24 or CHIP\n");
+        goto done;
+    }
     if (!seconds || seconds > 30 || readsize < 65536 || readsize > 0x100000 ||
         (readsize & 1023)) {
         P("SECONDS must be 1..30; READSIZE must be 64 KiB..1 MiB and a multiple of 1 KiB\n");
         goto done;
     }
-    if (args[4]) {
-        logfh = Open((STRPTR)args[4], MODE_NEWFILE);
+    if (args[5]) {
+        logfh = Open((STRPTR)args[5], MODE_NEWFILE);
         if (!logfh) {
-            P("Cannot open log %s\n", args[4]);
+            P("Cannot open log %s\n", args[5]);
             goto done;
         }
     }
@@ -289,9 +327,10 @@ LONG start(void)
         P("ReadEClock returned zero frequency\n");
         goto done;
     }
-    buf = (UBYTE *)AllocMem(readsize, MEMF_PUBLIC);
+    buf = (UBYTE *)AllocMem(readsize, memflags);
     if (!buf) {
-        P("Cannot allocate %lu-byte read buffer\n", readsize);
+        P("Cannot allocate %lu-byte %s read buffer (requested flags %08lx)\n",
+          readsize, (ULONG)memname, memflags);
         goto done;
     }
     w = start_worker();
@@ -300,12 +339,14 @@ LONG start(void)
         goto done;
     }
 
-    P("MCCpuBench 0.1: %s unit %lu, %lu KiB reads, worker priority -10\n",
+    P("MCCpuBench 0.2: %s unit %lu, %lu KiB reads, worker priority -10\n",
       (ULONG)device, unit, readsize / 1024);
-    P("Device version %lu.%lu; buffer %08lx memory flags %08lx; EClock %lu Hz\n",
+    P("Buffer request %s flags %08lx; address %08lx actual flags %08lx\n",
+      (ULONG)memname, memflags, (ULONG)buf, TypeOfMem(buf));
+    P("Device version %lu.%lu; EClock %lu Hz\n",
       (ULONG)io.io_Device->dd_Library.lib_Version,
       (ULONG)io.io_Device->dd_Library.lib_Revision,
-      (ULONG)buf, TypeOfMem(buf), efreq);
+      efreq);
     P("Idle calibration for nominal %lu seconds...\n", seconds);
     idle_c0 = w->count;
     idle_t0 = now();

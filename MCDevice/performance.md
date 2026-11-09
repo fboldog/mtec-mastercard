@@ -1053,6 +1053,24 @@ The tested profile comparison is therefore:
 The tested ADF including its returned logs has SHA-1
 `7c7d5b30a7a65f2a6571d365916907c071ed6890`.
 
+`MCCpuBench` 0.2 adds `MEMTYPE PUBLIC|FAST|DMA24|CHIP`. It passes the
+corresponding Exec flags to `AllocMem()` and records the requested class and
+flags alongside the returned address and `TypeOfMem()` flags. This distinguishes
+an RDB-style allocation request from the physical pool Exec actually selected.
+An unavailable class is reported without preventing a startup script from
+continuing to the next class.
+
+Two v34 disks compare the four classes with identical 512 KiB direct-device
+reads. Each first runs the normal read-only integrity suite, then saves
+`mem-public.log`, `mem-fast.log`, `mem-dma24.log` and `mem-chip.log` on DF0.
+`MCTest-memory-full-v34.adf` uses the unpaced production driver; its SHA-1 is
+`fa2ad65f57474d427d847ad68a52cf2e039e2491`. `MCTest-memory-coop500-v34.adf`
+uses the tested 500 us/64 KiB cooperative profile; its SHA-1 is
+`0426d351c66b401fe1c5a5103c62a16a1324852e`. Their embedded driver hashes are
+respectively `e199b264b99fba68e3298469f5faca7206659c0c` and
+`eee77ba688245a2fd0ea2f5b564bb902c3065202`; both contain the same benchmark,
+SHA-1 `4fe7789495db782254801ea9b541a80739b3881f`.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether

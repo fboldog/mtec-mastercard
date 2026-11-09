@@ -1,0 +1,21 @@
+; Compare direct-device reads into each Exec memory class. The image selects
+; either the full-speed or cooperative driver at build time.
+FailAt 21
+MakeDir RAM:T
+Assign T: RAM:T
+Echo "MCDevice memory-class integrity test (read-only)."
+MCDiag TAKEOVER LOG RAM:mcdiag-mem.log
+Type RAM:mcdiag-mem.log >DF0:mcdiag-mem.log
+Echo "PUBLIC buffer"
+MCCpuBench DEVICE mastercard.device UNIT 1 SECONDS 3 READSIZE 524288 MEMTYPE PUBLIC LOG RAM:mem-public.log
+Type RAM:mem-public.log >DF0:mem-public.log
+Echo "FAST buffer"
+MCCpuBench DEVICE mastercard.device UNIT 1 SECONDS 3 READSIZE 524288 MEMTYPE FAST LOG RAM:mem-fast.log
+Type RAM:mem-fast.log >DF0:mem-fast.log
+Echo "24-bit DMA buffer"
+MCCpuBench DEVICE mastercard.device UNIT 1 SECONDS 3 READSIZE 524288 MEMTYPE DMA24 LOG RAM:mem-dma24.log
+Type RAM:mem-dma24.log >DF0:mem-dma24.log
+Echo "CHIP buffer (allocation may fail if 512 KiB is unavailable)"
+MCCpuBench DEVICE mastercard.device UNIT 1 SECONDS 3 READSIZE 524288 MEMTYPE CHIP LOG RAM:mem-chip.log
+Type RAM:mem-chip.log >DF0:mem-chip.log
+Echo "Done: DF0:mcdiag-mem.log and mem-*.log"
