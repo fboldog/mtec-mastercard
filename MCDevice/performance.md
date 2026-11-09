@@ -933,6 +933,15 @@ reducing it may expose refill gaps to tasks, but only hardware measurement can
 show whether the board deasserts INT2 long enough to schedule them and what
 throughput it costs.
 
+`MCTest-cpu-irq-round1-v30.adf` isolates that experiment. Its production driver
+is built with `MC_IRQ_ROUNDS=1` instead of 4; no other driver or benchmark
+setting changes. It first runs the full read-only MCDiag integrity suite, then
+the same three-pass calibrated CPU-availability test, followed by three normal
+`devtest -bb` passes without the worker. The floppy retains `mcdiag-r1.log`,
+`cpu-mc-r1.log` and `devtest-r1.log`. The rounds=1 driver SHA-1 is
+`288be67a511cdc7b98e0d67df9e6b2fa802ac4f6`; the default production artifacts
+were rebuilt afterward and retain their established hashes.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether
