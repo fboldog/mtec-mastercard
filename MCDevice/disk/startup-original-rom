@@ -1,0 +1,20 @@
+; Benchmark the original mtecscsi.device without replacing or patching it.
+; The current hardware setup maps the BlueSCSI disk to original-driver unit 1.
+FailAt 21
+MakeDir RAM:T
+Assign T: RAM:T
+Echo "Original M-Tec ROM driver benchmark, unit 1." >RAM:mtec-rom.log
+Version mtecscsi.device >>RAM:mtec-rom.log
+devtest -p mtecscsi.device >>RAM:mtec-rom.log
+devtest -g mtecscsi.device 1 >>RAM:mtec-rom.log
+devtest -t mtecscsi.device 1 >>RAM:mtec-rom.log
+Echo "== throughput pass 1" >>RAM:mtec-rom.log
+devtest -bb mtecscsi.device 1 >>RAM:mtec-rom.log
+Echo "== throughput pass 2" >>RAM:mtec-rom.log
+devtest -bb mtecscsi.device 1 >>RAM:mtec-rom.log
+Echo "== throughput pass 3" >>RAM:mtec-rom.log
+devtest -bb mtecscsi.device 1 >>RAM:mtec-rom.log
+Echo "== done" >>RAM:mtec-rom.log
+Type RAM:mtec-rom.log >DF0:mtec-rom.log
+Echo "Done. The original driver was not replaced."
+Echo "The result is DF0:mtec-rom.log."

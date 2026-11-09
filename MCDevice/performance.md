@@ -863,6 +863,12 @@ throughput, command latency, maximum vertical-blank gap and integrity as the
 primary measurements; a separate cycle/progress measurement is needed for true
 CPU consumption.
 
+`MCTest-original-rom-benchmark-v28.adf` provides an apples-to-apples repeat of
+the scheduler metric with the current target setup. Its dedicated startup does
+not invoke MCDiag or replace the ROM driver. It records the original
+`mtecscsi.device` version, device/API/latency checks, and three `devtest -bb`
+passes against unit 1 to `DF0:mtec-rom.log`. It is read-only.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether
