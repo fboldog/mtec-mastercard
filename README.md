@@ -16,7 +16,7 @@ test history and the patched M-Tec ROM, is in [DETAILS.md](DETAILS.md).
   64-bit commands. The ETD ones check the medium change count.
 - **SCSI commands:** `HD_SCSICMD` with automatic sense data, including 16-byte
   commands.
-- **Commands M-Tec's driver lacks:** `TD_GETGEOMETRY`, `TD_GETNUMTRACKS`,
+- **More device commands:** `TD_GETGEOMETRY`, `TD_GETNUMTRACKS`,
   `TD_EJECT`, `TD_CHANGESTATE`, write protection in `TD_PROTSTATUS` (CD-ROM, WORM
   and write-protected disks), and an NSD device query.
 - **Interrupt-driven transfers:** the data moves in the card's interrupt
@@ -45,21 +45,16 @@ Both buttons together still open Kickstart's own Early Startup menu.
 
 ## Fixed bugs
 
-Compared with M-Tec's `mtecscsi.device` 2.3:
+- Reads and writes past 2 GB work: the byte offset is handled as unsigned.
+- The whole disk is reachable through normal I/O, also beyond 4 GB.
+- `TD_REMOVE` with NULL removes the change handler instead of calling it later.
+- `HD_SCSICMD` without autosense reports a bad status as `HFERR_BadStatus` (45).
+- After a selection timeout, `scsi_Status` is 0.
+- Errors reported by the SCSI chip end the command and reset the bus, instead
+  of going unnoticed.
 
-| Problem in M-Tec's driver | In `mastercard.device` |
-|---|---|
-| Reads and writes past 2 GB fail: the 32-bit byte offset is treated as signed | Work up to 2 TB |
-| Normal I/O can't reach past 4 GB: no TD64, NSD or ETD commands | All three supported |
-| devtest finds only 4 GB of a 6 GB disk: its read-to-capacity search stops at sector 8388607 | The full capacity |
-| `TD_GETGEOMETRY`, `TD_GETNUMTRACKS`, `TD_EJECT`, `ETD_` and NSD commands are missing | Implemented |
-| `TD_REMOVE` with NULL stores it and later calls `Cause(NULL)` | Removes the handler |
-| `HD_SCSICMD` without autosense returns the raw SCSI status in `io_Error` | `HFERR_BadStatus` (45) |
-| A selection timeout leaves 44 in `scsi_Status` | `scsi_Status` is 0 |
-| Chip error bits are cleared and ignored; in the sync tests this most likely let a FIFO overrun damage memory | Errors end the command and reset the bus |
-
-`MTecPatch` 1.3 fixes the same command bugs for M-Tec's own driver, from RAM
-or built into its ROM; see [DETAILS.md](DETAILS.md).
+`MTecPatch` brings the same command fixes to the original `mtecscsi.device`,
+from RAM or built into its ROM; see [DETAILS.md](DETAILS.md).
 
 ## Performance
 
