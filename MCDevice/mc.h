@@ -164,6 +164,20 @@ struct Xfer {
     struct MCStats st;
 };
 
+#ifdef ROM_BUILD
+/* A partition from an RDB, as the boot menu lists it. */
+#define MC_MAX_PARTS 16
+struct MCPart {
+    UBYTE target;
+    UBYTE flags;            /* PBFF_BOOTABLE, PBFF_NOMOUNT */
+    BYTE bootpri;
+    UBYTE pad;
+    ULONG dostype;
+    ULONG mb;
+    char name[12];
+};
+#endif
+
 struct MC {
     struct Library lib;
     UWORD pad;
@@ -186,6 +200,8 @@ struct MC {
     struct Xfer x;
 #ifdef ROM_BUILD
     UBYTE absent;               /* targets the boot menu's scan found empty */
+    UBYTE nparts;
+    struct MCPart parts[MC_MAX_PARTS];  /* what the boot menu's scan found in the RDBs */
 #endif
 };
 

@@ -118,8 +118,10 @@ def blob(path):
         tag = img.find(b"\x4a\xfc", tag + 2)
     if tag < 0:
         fail("no RomTag in the driver")
+    if total > 0xFFFF:
+        fail("driver is over 64 KB, too big for 16-bit relocation offsets")
     out = struct.pack(">4L", total, len(img), len(fix), tag) + img
-    out += b"".join(struct.pack(">L", p) for p in sorted(fix))
+    out += b"".join(struct.pack(">H", p) for p in sorted(fix))
     return out, total, len(fix)
 
 

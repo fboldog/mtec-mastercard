@@ -8,9 +8,10 @@
  * ROM but is only started on first use, by ramlib once DOS runs, so the menu
  * starts it itself with FindResident and InitResident, as ramlib would.
  *
- * It lists the devices the driver found, then continues the boot (Return)
- * or skips the card's partitions for this boot (Esc). Anything that fails
- * to open falls back to a normal boot.
+ * It shows a table of the devices the driver found, each followed by the
+ * partitions of its RDB, with * or - for mount and boot, then continues the
+ * boot (Return) or skips the card's partitions for this boot (Esc). Anything
+ * that fails to open falls back to a normal boot.
  */
 #include <exec/execbase.h>
 #include <exec/resident.h>
@@ -22,6 +23,7 @@
 #include <intuition/screens.h>
 #include <libraries/gadtools.h>
 #include <utility/tagitem.h>
+#include <devices/hardblocks.h>
 #include "mc.h"
 
 struct IntuitionBase *IntuitionBase;
@@ -40,10 +42,11 @@ void *memset(void *d, int c, unsigned long n);
 #define GID_BOOT 1
 #define GID_SKIP 2
 
-#define ROWS  7                         /* SCSI IDs 0-6 */
-#define BUTTON_W_MIN 200
+#define ROWS   7                        /* SCSI IDs 0-6 */
+#define COLS   7
+#define CELL   24                       /* longest cell text */
 #define MARGIN 16                       /* window border to content */
-#define PAD_X  10                       /* list box edge to text */
+#define PAD_X  8                        /* table box edge to text */
 #define PAD_V  2                        /* box edge to the letters, above and below */
 
 #ifdef IRQXFER
@@ -54,9 +57,15 @@ void *memset(void *d, int c, unsigned long n);
 
 static const char title[] = "M-Tec MasterCard SCSI";
 static const char wtitle[] = "MasterCard SCSI boot options";
-static const char heading[] = "Devices found";
 static const char info[] = "mastercard.device 0.1, " MODE_TEXT ", asynchronous SCSI";
 static const char none[] = "No SCSI devices answered.";
+
+/* Column widths in characters, and which are right-aligned. */
+static const UBYTE colw[COLS] = { 4, 5, 4, 20, 6, 4, 8 };
+#define RIGHT(c) ((c) == 5 || (c) == 6)
+static const char *const head[COLS] = {
+    "Unit", "Mount", "Boot", "Device / Partition", "Type", "Pri", "Size"
+};
 
 /* Active-low buttons. Requiring left released leaves both buttons to
    Kickstart's Early Startup menu. */
@@ -69,6 +78,8 @@ int bootui_requested(void)
 #endif
 }
 
+/* ---- cell text ---- */
+
 static char *put(char *d, const char *s, int n)
 {
     while (n-- && *s)
@@ -76,15 +87,46 @@ static char *put(char *d, const char *s, int n)
     return d;
 }
 
-static char *num(char *d, ULONG v)
+static char *num(char *d, LONG v)
 {
     char t[10];
     int n = 0;
+    if (v < 0) {
+        *d++ = '-';
+        v = -v;
+    }
     do
         t[n++] = '0' + v % 10;
     while ((v /= 10) && n < 10);
     while (n)
         *d++ = t[--n];
+    return d;
+}
+
+static char *size(char *d, ULONG mb)
+{
+    if (mb >= 10000)
+        return put(num(d, mb >> 10), " GB", 3);
+    return put(num(d, mb), " MB", 3);
+}
+
+/* Vendor and product from INQUIRY, single-spaced. */
+static char *ident(char *d, const char *s)
+{
+    char *start = d;
+    int k, sp = 0;
+    for (k = 0; k < 24; k++) {
+        if (s[k] == ' ') {
+            sp = 1;
+            continue;
+        }
+        if (sp && d > start)
+            *d++ = ' ';
+        sp = 0;
+        *d++ = s[k];
+        if (k == 7)
+            sp = 1;                     /* vendor and product are separate */
+    }
     return d;
 }
 
@@ -100,30 +142,63 @@ static const char *type_name(UBYTE t)
     }
 }
 
-/* "ID 1  QUANTUM  BlueSCSI Pico      1.0   Disk     8044 MB" */
-static int line(struct MCUnit *u, char *b)
+/* Fills the cells of row r: each device, then its partitions. Returns 0 past
+   the end. Cell c holds end[c] characters. */
+static int row(struct MC *mc, UWORD r, char cells[COLS][CELL], UBYTE end[COLS])
 {
-    char *d = b;
-    d = put(d, "ID ", 3);
-    *d++ = '0' + u->target;
-    *d++ = ' ';
-    *d++ = ' ';
-    d = put(d, u->ident, 8);            /* vendor */
-    *d++ = ' ';
-    d = put(d, u->ident + 8, 16);       /* product */
-    *d++ = ' ';
-    d = put(d, u->ident + 24, 4);       /* revision */
-    *d++ = ' ';
-    *d++ = ' ';
-    d = put(d, type_name(u->type), 8);
-    if (u->shift && u->blocks) {
-        *d++ = ' ';
-        *d++ = ' ';
-        d = num(d, u->blocks >> (20 - u->shift));
-        d = put(d, " MB", 3);
+    UWORD k, i;
+    for (k = 0; k < ROWS; k++) {
+        struct MCUnit *u = mc->units[k];
+        if (!u)
+            continue;
+        memset(end, 0, COLS);
+        if (!r--) {
+            int boot = 0;
+            for (i = 0; i < mc->nparts; i++)
+                if (mc->parts[i].target == k &&
+                    (mc->parts[i].flags & (PBFF_BOOTABLE | PBFF_NOMOUNT)) == PBFF_BOOTABLE)
+                    boot = 1;
+            cells[0][0] = '0' + k;
+            end[0] = 1;
+            cells[1][0] = '*';
+            end[1] = 1;
+            cells[2][0] = boot ? '*' : '-';
+            end[2] = 1;
+            end[3] = ident(cells[3], u->ident) - cells[3];
+            end[4] = put(cells[4], type_name(u->type), 7) - cells[4];
+            if (u->shift && u->blocks)
+                end[6] = size(cells[6], u->blocks >> (20 - u->shift)) - cells[6];
+            return 1;
+        }
+        for (i = 0; i < mc->nparts; i++) {
+            struct MCPart *p = &mc->parts[i];
+            char *d;
+            int b;
+            if (p->target != k || r--)
+                continue;
+            cells[1][0] = p->flags & PBFF_NOMOUNT ? '-' : '*';
+            end[1] = 1;
+            cells[2][0] = (p->flags & (PBFF_BOOTABLE | PBFF_NOMOUNT)) == PBFF_BOOTABLE ? '*' : '-';
+            end[2] = 1;
+            end[3] = put(cells[3], p->name, 11) - cells[3];
+            d = cells[4];
+            for (b = 24; b > 0; b -= 8) {
+                UBYTE ch = p->dostype >> b;
+                *d++ = ch >= ' ' && ch < 127 ? ch : '?';
+            }
+            *d++ = '\\';
+            b = p->dostype & 0xFF;
+            *d++ = b < 10 ? '0' + b : b >= ' ' && b < 127 ? b : '?';
+            end[4] = d - cells[4];
+            end[5] = num(cells[5], p->bootpri) - cells[5];
+            end[6] = size(cells[6], p->mb) - cells[6];
+            return 1;
+        }
     }
-    return d - b;
+    return 0;
 }
+
+/* ---- drawing ---- */
 
 static void text(struct RastPort *rp, UWORD pen, WORD x, WORD y, const char *s, int n)
 {
@@ -143,9 +218,13 @@ int bootui_show(struct MC *mc)
     APTR vi = 0;
     struct NewGadget ng;
     struct Resident *rt;
+    struct RastPort *rp;
+    char cells[COLS][CELL];
+    UBYTE end[COLS];
+    WORD colx[COLS + 1];
     int done = 0, skip = 0;
-    WORD fh, top, h, y, x, tw, bw, ww, lw, cw, boxh, padt;
-    UWORD k, rows = 0;
+    WORD fh, top, h, y, x, cw, bw, ww, boxh, padt, chw, rowh;
+    UWORD k, c, rows = 0, maxrows;
 
     IntuitionBase = (struct IntuitionBase *)OpenLibrary((STRPTR)"intuition.library", 39);
     GfxBase = (struct GfxBase *)OpenLibrary((STRPTR)"graphics.library", 39);
@@ -169,40 +248,33 @@ int bootui_show(struct MC *mc)
     }
     if (!(dri = (struct DrawInfo *)GetScreenDrawInfo(scr)) || !(vi = (APTR)GetVisualInfoA(scr, 0)))
         goto out;
+
+    /* Layout, from the screen's font. The columns sit one character apart and
+       each cell is drawn at its own column, so they line up in any font. The
+       letters end at the font's baseline; the rows below it are for
+       descenders, so the top gets them as extra padding and the text sits
+       centred in the box. */
     fh = scr->Font->ta_YSize;
+    rowh = fh + 2;
     top = scr->WBorTop + fh + 1;        /* below the window title bar */
-    /* Layout, all from the screen's font. One content width cw is shared by
-       the heading, the list box, the info line and the two buttons, inset
-       MARGIN from the window borders. List text sits PAD_X inside the box.
-       Vertically the letters end at the font's baseline and the rows below it
-       are only for descenders, so the top gets those rows as extra padding:
-       the visible text then sits centred in any font (topaz 8, topaz 9...). */
-    lw = 0;
-    for (k = 0; k < ROWS; k++)
-        if (mc->units[k]) {
-            char b[64];
-            WORD w = TextLength(&scr->RastPort, (STRPTR)b, line(mc->units[k], b));
-            if (w > lw)
-                lw = w;
-            rows++;
-        }
-    if (!rows)
-        lw = TextLength(&scr->RastPort, (STRPTR)none, sizeof none - 1);
-    cw = lw + 2 * PAD_X;
-    tw = TextLength(&scr->RastPort, (STRPTR)info, sizeof info - 1);
-    if (tw > cw)
-        cw = tw;
+    chw = TextLength(&scr->RastPort, (STRPTR)"0", 1);
+    colx[0] = 0;
+    for (c = 0; c < COLS; c++)
+        colx[c + 1] = colx[c] + (colw[c] + 1) * chw;
+    cw = colx[COLS] - chw + 2 * PAD_X;
+    padt = PAD_V + (fh - 1 - scr->RastPort.TxBaseline);
+    while (row(mc, rows, cells, end))
+        rows++;
+    /* As many rows as fit below the title bars, header, info line and buttons. */
+    maxrows = (scr->Height - scr->BarHeight - top - scr->WBorBottom - 3 * rowh - 2 * fh - 40) / rowh;
+    if (rows > maxrows)
+        rows = maxrows;
+    boxh = 1 + padt + (rows ? rows + 1 : 2) * rowh + 4 - 2 + PAD_V + 1;     /* header, line, rows */
     bw = TextLength(&scr->RastPort, (STRPTR)"Skip card this boot", 19) + 24;
-    if (bw < BUTTON_W_MIN)
-        bw = BUTTON_W_MIN;
-    if (2 * bw + MARGIN > cw)
-        cw = 2 * bw + MARGIN;
     ww = scr->WBorLeft + MARGIN + cw + MARGIN + scr->WBorRight;
     if (ww > scr->Width)
         ww = scr->Width;
-    padt = PAD_V + (fh - 1 - scr->RastPort.TxBaseline);
-    boxh = 1 + padt + (rows ? rows : 1) * (fh + 2) - 2 + PAD_V + 1;
-    h = top + 6 + fh + 4 + boxh + 8 + fh + 10 + (fh + 6) + 6 + scr->WBorBottom;
+    h = top + 6 + boxh + 8 + fh + 10 + (fh + 6) + 6 + scr->WBorBottom;
 
     if (!(g = (struct Gadget *)CreateContext(&glist)))
         goto out;
@@ -242,30 +314,50 @@ int bootui_show(struct MC *mc)
             goto out;
     }
     GT_RefreshWindow(win, 0);
+    rp = win->RPort;
 
-    /* The device list, in a recessed box like a list view. */
+    /* The table, in a recessed box: a header, a line, then the rows, with a
+       line between the columns. */
     x = win->BorderLeft + MARGIN;
     y = top + 6;
-    text(win->RPort, dri->dri_Pens[HIGHLIGHTTEXTPEN], x, y + win->RPort->TxBaseline, heading, sizeof heading - 1);
-    y += fh + 4;
     {
         struct TagItem bt[] = { { GT_VisualInfo, (ULONG)vi }, { GTBB_Recessed, TRUE }, { TAG_DONE, 0 } };
-        DrawBevelBoxA(win->RPort, x, y, cw, boxh, bt);
+        DrawBevelBoxA(rp, x, y, cw, boxh, bt);
     }
     {
-        WORD ty = y + 1 + padt;
+        WORD tx = x + PAD_X, ty = y + 1 + padt, line_y = ty + rowh + 1;
+        for (c = 0; c < COLS; c++) {
+            int n = 0;
+            while (head[c][n])
+                n++;
+            text(rp, dri->dri_Pens[HIGHLIGHTTEXTPEN],
+                 tx + colx[c] + (RIGHT(c) ? colw[c] * chw - TextLength(rp, (STRPTR)head[c], n) : 0),
+                 ty + rp->TxBaseline, head[c], n);
+        }
+        SetAPen(rp, dri->dri_Pens[SHADOWPEN]);
+        Move(rp, x + 2, line_y);
+        Draw(rp, x + cw - 3, line_y);
+        for (c = 1; c < COLS; c++) {
+            Move(rp, tx + colx[c] - chw / 2 - 1, y + 1);
+            Draw(rp, tx + colx[c] - chw / 2 - 1, y + boxh - 2);
+        }
+        ty += rowh + 4;
         if (!rows)
-            text(win->RPort, dri->dri_Pens[TEXTPEN], x + PAD_X, ty + win->RPort->TxBaseline, none, sizeof none - 1);
-        for (k = 0; k < ROWS; k++)
-            if (mc->units[k]) {
-                char b[64];
-                int n = line(mc->units[k], b);
-                text(win->RPort, dri->dri_Pens[TEXTPEN], x + PAD_X, ty + win->RPort->TxBaseline, b, n);
-                ty += fh + 2;
-            }
+            text(rp, dri->dri_Pens[TEXTPEN], tx + colx[3], ty + rp->TxBaseline, none, sizeof none - 1);
+        for (k = 0; k < rows; k++) {
+            row(mc, k, cells, end);
+            for (c = 0; c < COLS; c++)
+                if (end[c]) {
+                    int n = end[c] > colw[c] ? colw[c] : end[c];
+                    text(rp, dri->dri_Pens[TEXTPEN],
+                         tx + colx[c] + (RIGHT(c) ? colw[c] * chw - TextLength(rp, (STRPTR)cells[c], n) : 0),
+                         ty + rp->TxBaseline, cells[c], n);
+                }
+            ty += rowh;
+        }
     }
     y += boxh + 8;
-    text(win->RPort, dri->dri_Pens[TEXTPEN], x, y + win->RPort->TxBaseline, info, sizeof info - 1);
+    text(rp, dri->dri_Pens[TEXTPEN], x, y + rp->TxBaseline, info, sizeof info - 1);
 
     while (!done) {
         struct IntuiMessage *m;

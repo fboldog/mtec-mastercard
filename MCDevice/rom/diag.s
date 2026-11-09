@@ -11,7 +11,8 @@
 | The blob, written by pack.py, is byte-wide on even board addresses, so
 | movep.l reads one long of it from 8 board bytes:
 |   0 memory size (code + data + bss)   4 image bytes   8 relocations
-|  12 RomTag offset                    16 image          ... relocation offsets
+|  12 RomTag offset                    16 image          ... relocation offsets,
+| one word each: the driver is far below 64 KB.
 
 	.text
 da:
@@ -56,8 +57,9 @@ DiagPoint:
 2:	dbf	d6,1b
 	move.l	a5,d2
 	bra.s	4f
-3:	movep.l	0(a4),d1		| relocate
-	addq.l	#8,a4
+3:	moveq	#0,d1			| relocate: 16-bit offsets
+	movep.w	0(a4),d1
+	addq.l	#4,a4
 	add.l	d2,0(a5,d1.l)
 4:	dbf	d5,3b
 	jsr	-636(a6)		| CacheClearU

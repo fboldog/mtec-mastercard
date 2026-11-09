@@ -518,8 +518,10 @@ At boot:
 
 **Boot menu:** holding the right mouse button at power-on opens it; both
 buttons stay Kickstart's own Early Startup menu. The driver first finds the
-devices, then shows them in a window: SCSI ID, vendor, product, revision, type
-and size. **Boot** (Return) continues; **Skip card this boot** (Esc) leaves the
+devices and reads their RDBs, then shows them in a window: SCSI ID, vendor,
+product, revision, type and size for each device, and under each disk its
+partitions with drive name, file system type (`DOS\3`, `PFS\3`...), size and
+boot priority, or "not bootable" / "not mounted". Up to 16 partitions are listed. **Boot** (Return) continues; **Skip card this boot** (Esc) leaves the
 card's partitions unmounted for this boot only. The menu uses the system's own
 look: a screen like Workbench's, with the default 3D pens and the system font,
 and a GadTools window sized to its text, its list padding taken from the font's
@@ -532,8 +534,8 @@ continues.
 The ROM build leaves out MCDiag's private command and its comparison modes
 (`MC_DIAG_MODES=0`): the normal driver only uses DMA16 and the automatic
 extended count, and an interrupt ROM moves all data in the server. That saved
-about 2.3 KB. With the menu, the interrupt ROM leaves 1,456 bytes free and the
-polled one 1,572. The disk drivers keep everything; the production one is
+about 2.3 KB. With the menu and its partition list, the interrupt ROM leaves
+472 bytes free and the polled one 568. The disk drivers keep everything; the production one is
 byte-identical to the validated build.
 
 Tested in Amiberry with Kickstart 3.1, from the ROM alone, no floppy:

@@ -15,8 +15,20 @@ if [ -n "$DOCKER" ]; then
     exec docker run --rm -u "$(id -u):$(id -g)" -v "$R:/w" -v "$N:/ndk:ro" -e NDK=/ndk \
         -e MC_CPU_MHZ="$MC_CPU_MHZ" -e MC_FAST_POLLS="$MC_FAST_POLLS" \
         -e MC_IRQ_ROUNDS="$MC_IRQ_ROUNDS" -e MC_COOP_US_PER_64K="$MC_COOP_US_PER_64K" \
-        -w /w/MCDevice "$DOCKER" ./build.sh
+        -e IN_DOCKER=1 -e ROM_GCC= -w /w/MCDevice "$DOCKER" ./build.sh
 fi
+# The ROM is built with GCC 16.2 from a container, 3% smaller than 15.2;
+# the disk drivers keep the local toolchain their hardware runs validated.
+# ROM_GCC= (empty) builds the ROM locally too.
+: "${ROM_GCC=stefanreinauer/amiga-gcc:gcc-v16.2}"
+romcc() {
+    if [ -n "$ROM_GCC" ]; then
+        docker run --rm -u "$(id -u):$(id -g)" -v "$(cd .. && pwd):/w" -v "$N:/ndk:ro" \
+            -w /w/MCDevice "$ROM_GCC" m68k-amigaos-gcc -I/ndk/Include_H "$@"
+    else
+        m68k-amigaos-gcc -I"$N/Include_H" "$@"
+    fi
+}
 PATH=/opt/amiga/bin:$PATH
 mkdir -p gen
 python3 ../MTecPatch/gen/genstubs.py "$N" \
@@ -25,7 +37,7 @@ python3 ../MTecPatch/gen/genstubs.py "$N" \
 python3 ../MTecPatch/gen/genstubs.py "$N" \
     exec=SysBase:Wait,OpenLibrary,CloseLibrary,FindResident,InitResident \
     intuition=IntuitionBase:OpenScreenTagList,CloseScreen,OpenWindowTagList,CloseWindow,GetScreenDrawInfo,FreeScreenDrawInfo \
-    graphics=GfxBase:SetAPen,Move,Text,TextLength \
+    graphics=GfxBase:SetAPen,Move,Draw,Text,TextLength \
     gadtools=GadToolsBase:GetVisualInfoA,FreeVisualInfo,CreateContext,CreateGadgetA,FreeGadgets,GT_GetIMsg,GT_ReplyIMsg,GT_RefreshWindow,GT_BeginRefresh,GT_EndRefresh,DrawBevelBoxA \
     > gen/bootstubs.h || exit 1
 # NewList is a macro in amiga.lib, which isn't linked.
@@ -59,9 +71,9 @@ ls -l mastercard.device mastercard-irq.device mastercard-sync-irq.device masterc
 # The boot ROM, in both variants: rom/MCROM[-irq]-16k.bin for the emulator,
 # rom/MCROM[-irq]-27C512.bin for the EPROM. Only our own code is in them.
 for V in ":" "-irq:-DIRQXFER"; do
-    m68k-amigaos-gcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
+    romcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
         -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-pointer-sign -Wno-array-bounds \
-        -DROM_BUILD -DMC_DIAG_MODES=0 $TUNE_DEFS ${V#*:} -I. -I../MTecPatch/gen -I"$N/Include_H" -o rom/driver${V%%:*}.hunk dev.c esp.c bootui.c || exit 1
+        -DROM_BUILD -DMC_DIAG_MODES=0 $TUNE_DEFS ${V#*:} -I. -I../MTecPatch/gen -o rom/driver${V%%:*}.hunk dev.c esp.c bootui.c || exit 1
     python3 rom/pack.py rom/driver${V%%:*}.hunk rom/diag.s rom/MCROM${V%%:*}-16k.bin rom/MCROM${V%%:*}-27C512.bin || exit 1
 done
 python3 ../MTecPatch/gen/genstubs.py "$N" \

@@ -309,21 +309,69 @@ static void add_partitions(struct MC *mc, struct MCUnit *u, struct FileSysResour
     }
 }
 
-/* MC_SCAN, in the task: probe every target on LUN 0 for the boot menu, and
-   remember the empty ones, so mounting doesn't wait for them again. */
+/* The boot menu's summary of a disk's partitions: name, file system, size
+   and boot priority, read from the RDB. */
+static void scan_parts(struct MC *mc, struct MCUnit *u, ULONG *buf)
+{
+    ULONG blk;
+    int guard = 0;
+    for (blk = 0; blk < RDB_LIMIT; blk++)
+        if (read_block(mc, u, blk, buf) && good_block(buf, IDNAME_RIGIDDISK))
+            break;
+    if (blk == RDB_LIMIT)
+        return;
+    blk = ((struct RigidDiskBlock *)buf)->rdb_PartitionList;
+    while (blk != 0xFFFFFFFFUL && guard++ < 64 && mc->nparts < MC_MAX_PARTS) {
+        struct PartitionBlock *pb = (struct PartitionBlock *)buf;
+        struct DosEnvec *de = (struct DosEnvec *)pb->pb_Environment;
+        struct MCPart *p = &mc->parts[mc->nparts];
+        ULONG n, k, blocks;
+        if (!read_block(mc, u, blk, buf) || !good_block(buf, IDNAME_PARTITION))
+            return;
+        blk = pb->pb_Next;
+        p->target = u->target;
+        p->flags = pb->pb_Flags;
+        p->bootpri = de->de_TableSize >= DE_BOOTPRI ? (BYTE)de->de_BootPri : 0;
+        p->dostype = de->de_TableSize >= DE_DOSTYPE ? de->de_DosType : 0x444F5300;
+        n = pb->pb_DriveName[0];
+        if (n > sizeof p->name - 1)
+            n = sizeof p->name - 1;
+        for (k = 0; k < n; k++)
+            p->name[k] = pb->pb_DriveName[1 + k];
+        p->name[n] = 0;
+        /* blocks of de_SizeBlock longs; MB without overflowing 32 bits */
+        blocks = (de->de_HighCyl - de->de_LowCyl + 1) * de->de_Surfaces * de->de_BlocksPerTrack;
+        p->mb = (blocks >> 11) * (de->de_SizeBlock >> 7);
+        mc->nparts++;
+    }
+}
+
+/* MC_SCAN, in the task: probe every target on LUN 0 for the boot menu,
+   remember the empty ones, so mounting doesn't wait for them again, and
+   read the partitions of the disks. */
 static void scan_all(struct MC *mc)
 {
+    ULONG *buf = (ULONG *)AllocMem(512, MEMF_PUBLIC);
     UWORD t;
     for (t = 0; t < MAX_TARGET; t++) {
         struct IOStdReq pr;
-        if (t == OWN_ID || mc->units[t])
+        struct MCUnit *u;
+        if (t == OWN_ID)
             continue;
-        memset(&pr, 0, sizeof pr);
-        pr.io_Offset = t;
-        probe(mc, &pr);
-        if (!mc->units[t])
+        if (!mc->units[t]) {
+            memset(&pr, 0, sizeof pr);
+            pr.io_Offset = t;
+            probe(mc, &pr);
+        }
+        if (!(u = mc->units[t])) {
             mc->absent |= 1 << t;
+            continue;
+        }
+        if (buf && u->type == 0 && u->shift == 9)
+            scan_parts(mc, u, buf);
     }
+    if (buf)
+        FreeMem(buf, 512);
 }
 
 /* MC_MOUNT, in the task: every disk on LUN 0. */
