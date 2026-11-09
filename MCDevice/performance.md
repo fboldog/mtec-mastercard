@@ -942,6 +942,24 @@ the same three-pass calibrated CPU-availability test, followed by three normal
 `288be67a511cdc7b98e0d67df9e6b2fa802ac4f6`; the default production artifacts
 were rebuilt afterward and retain their established hashes.
 
+The v30 results are
+[`logs/mcdiag-48-irq-round1-v30.log`](logs/mcdiag-48-irq-round1-v30.log),
+[`logs/cpu-49-irq-round1-v30.log`](logs/cpu-49-irq-round1-v30.log) and
+[`logs/devtest-50-irq-round1-v30.log`](logs/devtest-50-irq-round1-v30.log).
+Integrity remained clean at 84/0/1, but all three calibrated passes still gave
+0.0% background application CPU. Loaded throughput was 6565 KiB/s versus 6538
+KiB/s at rounds=4, a 0.4% difference. The ordinary three-pass averages were
+6681, 6266 and 5075 KiB/s for 512, 128 and 32 KiB requests; their -0.4%, +0.5%
+and +1.4% changes are normal run variation. Latency was likewise unchanged at
+3.009 ms.
+
+`MC_IRQ_ROUNDS=1` therefore has no useful effect. One round still performs the
+eight unrolled DREQ tests, and a continuously ready target remains inside the
+mover. A meaningful next experiment would be a zero-round ready-entry mode:
+consume data while DREQ remains continuously asserted, but return immediately
+at its first clear sample. That requires an explicit assembly exit for zero;
+using the current decrement loop with zero would underflow and spin.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether
