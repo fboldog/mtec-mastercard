@@ -17,10 +17,18 @@ if [ -n "$DOCKER" ]; then
         -e MC_IRQ_ROUNDS="$MC_IRQ_ROUNDS" -e MC_COOP_US_PER_64K="$MC_COOP_US_PER_64K" \
         -e IN_DOCKER=1 -e ROM_GCC= -w /w/MCDevice "$DOCKER" ./build.sh
 fi
-# The ROM is built with GCC 16.2 from a container, 3% smaller than 15.2;
+# The ROM (boot code, driver and menu) is built with GCC 16.2 from a container;
 # the disk drivers keep the local toolchain their hardware runs validated.
 # ROM_GCC= (empty) builds the ROM locally too.
 : "${ROM_GCC=stefanreinauer/amiga-gcc:gcc-v16.2}"
+romas() {
+    if [ -n "$ROM_GCC" ]; then
+        docker run --rm -u "$(id -u):$(id -g)" -v "$(cd .. && pwd):/w" \
+            -w /w/MCDevice "$ROM_GCC" m68k-amigaos-as "$@"
+    else
+        m68k-amigaos-as "$@"
+    fi
+}
 romcc() {
     if [ -n "$ROM_GCC" ]; then
         docker run --rm -u "$(id -u):$(id -g)" -v "$(cd .. && pwd):/w" -v "$N:/ndk:ro" \
@@ -70,11 +78,13 @@ done
 ls -l mastercard.device mastercard-irq.device mastercard-sync-irq.device mastercard-prod-irq.device
 # The boot ROM, in both variants: rom/MCROM[-irq]-16k.bin for the emulator,
 # rom/MCROM[-irq]-27C512.bin for the EPROM. Only our own code is in them.
+# The DiagArea (boot code) with the same toolchain; BLOBX = 2 * pack.py's BLOB.
+romas -m68020 --defsym BLOBX=1024 -o rom/diag.o rom/diag.s || exit 1
 for V in ":" "-irq:-DIRQXFER"; do
     romcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
         -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-pointer-sign -Wno-array-bounds \
         -DROM_BUILD -DMC_DIAG_MODES=0 $TUNE_DEFS ${V#*:} -I. -I../MTecPatch/gen -o rom/driver${V%%:*}.hunk dev.c esp.c bootui.c || exit 1
-    python3 rom/pack.py rom/driver${V%%:*}.hunk rom/diag.s rom/MCROM${V%%:*}-16k.bin rom/MCROM${V%%:*}-27C512.bin || exit 1
+    python3 rom/pack.py rom/driver${V%%:*}.hunk rom/diag.o rom/MCROM${V%%:*}-16k.bin rom/MCROM${V%%:*}-27C512.bin || exit 1
 done
 python3 ../MTecPatch/gen/genstubs.py "$N" \
     exec=SysBase:FindTask,Forbid,Permit,Disable,Enable,AllocMem,FreeMem,FindName,Remove,AddIntServer,RemIntServer,SetFunction,CacheClearU,OpenLibrary,CloseLibrary,OpenDevice,CloseDevice,DoIO \

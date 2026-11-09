@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Builds the mastercard.device boot ROM.
 
-    pack.py DRIVER_HUNK DIAG_S OUT16 OUT64
+    pack.py DRIVER_HUNK DIAG OUT16 OUT64
 
 DRIVER_HUNK is the driver linked with -DROM_BUILD, an Amiga executable.
 Its hunks are laid out one after another in a single memory block, the
 relocations turned into offsets into that block, and the result stored
-byte-wide at image $0200 (board $0400). DIAG_S is the DiagArea, assembled
-here with the blob's board offset and stored nibble-wide at image $0040.
+byte-wide at image $0200 (board $0400). DIAG is the DiagArea: diag.s,
+assembled here with the blob's board offset, or diag.o, already assembled
+with BLOBX=1024. It is stored nibble-wide at image $0040.
 OUT16 is the 16 KB image the card shows; OUT64 is the 27C512 image, the
 16 KB in all four quarters.
 
@@ -126,13 +127,18 @@ def blob(path):
 
 
 def diagarea(src, blobx):
-    with tempfile.TemporaryDirectory() as d:
-        o = os.path.join(d, "diag.o")
-        r = subprocess.run([AS, "-m68020", "--defsym", "BLOBX=%d" % blobx, "-o", o, src],
-                           capture_output=True, text=True)
-        if r.returncode:
-            fail("diag.s:\n" + r.stderr)
-        b = open(o, "rb").read()
+    if src.endswith(".o"):
+        # Assembled already (build.sh does it with the ROM's toolchain),
+        # with BLOBX set to 2 * BLOB.
+        b = open(src, "rb").read()
+    else:
+        with tempfile.TemporaryDirectory() as d:
+            o = os.path.join(d, "diag.o")
+            r = subprocess.run([AS, "-m68020", "--defsym", "BLOBX=%d" % blobx, "-o", o, src],
+                               capture_output=True, text=True)
+            if r.returncode:
+                fail("diag.s:\n" + r.stderr)
+            b = open(o, "rb").read()
     # the code hunk of the object
     i = 0
     while i < len(b):

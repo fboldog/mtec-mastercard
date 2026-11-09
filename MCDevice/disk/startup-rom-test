@@ -1,0 +1,25 @@
+; ROM driver test: tests mastercard.device from the EPROM. This disk has no
+; driver in DEVS:, and nothing replaces or reloads the one in ROM.
+; Read-only. The log goes to RAM: first and is copied to DF0:mcrom.log.
+FailAt 21
+MakeDir RAM:T
+Assign T: RAM:T
+Echo "MasterCard ROM driver test - read-only, the log goes to DF0:mcrom.log"
+Echo "== MasterCard ROM driver test" >RAM:mcrom.log
+Echo "== Volumes mounted at boot by the ROM driver" >>RAM:mcrom.log
+Info >>RAM:mcrom.log
+Set u `MCDiag FINDUNIT`
+Echo "== devtest probe" >>RAM:mcrom.log
+devtest -p mastercard.device >>RAM:mcrom.log
+Echo "== devtest geometry, unit $u" >>RAM:mcrom.log
+devtest -g mastercard.device $u >>RAM:mcrom.log
+Echo "== devtest packets" >>RAM:mcrom.log
+devtest -t mastercard.device $u >>RAM:mcrom.log
+Echo "== devtest speed and latency" >>RAM:mcrom.log
+devtest -bb mastercard.device $u >>RAM:mcrom.log
+Echo "== MCCpuBench: 512 KiB reads, real CPU left for programs" >>RAM:mcrom.log
+MCCpuBench DEVICE mastercard.device UNIT $u SECONDS 3 READSIZE 524288 LOG RAM:cpu-rom.log
+Type RAM:cpu-rom.log >>RAM:mcrom.log
+Echo "== done" >>RAM:mcrom.log
+Type RAM:mcrom.log >DF0:mcrom.log
+Echo "Done. The log is DF0:mcrom.log (More DF0:mcrom.log)."

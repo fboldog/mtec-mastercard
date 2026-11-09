@@ -40,3 +40,4 @@ MTecPatch/-
 docs/
 # Photos of the test screen
 MCDevice/*.jpg
+MCDevice/rom/diag.o

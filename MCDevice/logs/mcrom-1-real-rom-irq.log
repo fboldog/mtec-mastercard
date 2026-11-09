@@ -1,0 +1,89 @@
+== MasterCard ROM driver test
+== Volumes mounted at boot by the ROM driver
+
+Mounted disks:
+Unit      Size    Used    Free Full Errs   Status   Name
+RAM:        2K       4       0 100%   0  Read/Write Ram Disk
+DF0:      880K     333    1425  18%   0  Read/Write MCTEST
+
+Volumes available:
+Ram Disk [Mounted]
+MCTEST [Mounted]
+== devtest probe
+  1 QUANTUM  BlueSCSI Pico    1.0  Disk     512  6441 MB
+== devtest geometry, unit 1
+                 SSize TotalSectors    Cyl Head  Sect DType Removable
+TD_GETGEOMETRY     512     12582912  12483   16    63  0x00 No
+Inquiry                                                0x00 No
+READ_CAPACITY_10   512     12582912
+READ_CAPACITY_16   512     12582912
+Read-to capacity   512     12582912
+Mode Page 0x03     512                             48
+Mode Page 0x04                       16384   16
+Mode Page 0x0c len=22
+Mode Page 0x31 len=42
+== devtest packets
+TD_GETGEOMETRY     Success  12582912 x 512  C=12483 H=16 S=63 Type=0
+TD_CHANGENUM       Success  Count=1
+TD_CHANGESTATE     Success  Disk present
+TD_PROTSTATUS      Success  Unprotected
+TD_GETDRIVETYPE    Fail -3  IOERR_NOCMD
+TD_GETNUMTRACKS    Success  Tracks=199728
+TD_RAWREAD         Fail -3  IOERR_NOCMD
+CMD_UPDATE         Success
+SCSI command requires at least two arguments (len and cmd)
+SCSICMD Inquiry    Success  V='QUANTUM' P='BlueSCSI Pico' R='1.0' DT=0x0 Linked Sync
+SCSICMD TUR        Success  Ready
+NSCMD_DEVICEQUERY  Success
+CMD_READ           Success
+ETD_READ           Success
+TD_READ64          Success
+NSCMD_TD_READ64    Success
+NSCMD_ETD_READ64   Success
+TD_SEEK            Success
+ETD_SEEK           Success
+TD_SEEK64          Success
+NSCMD_TD_SEEK64    Success
+NSCMD_ETD_SEEK64   Success
+TD_MOTOR ON        Success
+TD_MOTOR OFF       Success
+== devtest speed and latency
+Test mastercard.device 1 with Zorro II RAM
+read  512 KB xfers          7018 KB/sec (100% CPU)
+read  128 KB xfers          6412 KB/sec (100% CPU)
+read   32 KB xfers          5227 KB/sec (100% CPU)
+OpenDevice / CloseDevice    0.018 ms
+OpenDevice multiple         0.010 ms
+CloseDevice multiple        0.002 ms
+TD_GETGEOMETRY sequential   2.080 ms
+TD_GETGEOMETRY parallel     2.081 ms
+TD_CHANGENUM                0.005 ms 
+TD_CHANGENUM quick          0.001 ms 
+CMD_INVALID                 0.023 ms 
+CMD_START                   1.019 ms 
+CMD_READ butterfly average  0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly far      0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ butterfly constant 0.028 ms  Fail -4  IOERR_BADLENGTH
+CMD_READ sequential         3.009 ms 
+CMD_READ parallel           3.009 ms
+HD_SCSICMD read sequential  3.007 ms
+HD_SCSICMD read parallel    3.008 ms
+== MCCpuBench: 512 KiB reads, real CPU left for programs
+MCCpuBench 0.2: mastercard.device unit 1, 512 KiB reads, worker priority -10
+Buffer request PUBLIC flags 00000001; address 002613D8 actual flags 00000605
+Device version 0.1; EClock 709379 Hz
+Idle calibration for nominal 3 seconds...
+IDLE: 3019 ms, worker 11927296 units, 3950 units/ms
+READ pass 1:
+  39 commands, 3030 ms, 6590 KiB/s, worker 0 units
+  APPLICATION CPU AVAILABLE: 0.0% (denied 100.0%)
+READ pass 2:
+  39 commands, 3059 ms, 6527 KiB/s, worker 0 units
+  APPLICATION CPU AVAILABLE: 0.0% (denied 100.0%)
+READ pass 3:
+  39 commands, 3068 ms, 6508 KiB/s, worker 0 units
+  APPLICATION CPU AVAILABLE: 0.0% (denied 100.0%)
+AVERAGE: 6541 KiB/s, application CPU available 0.0%
+The availability ratio counts completed worker instructions; interrupt
+time cannot be classified as idle merely because no task switch occurred.
+== done

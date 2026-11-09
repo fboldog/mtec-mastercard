@@ -553,11 +553,21 @@ Tested in Amiberry with Kickstart 3.1, from the ROM alone, no floppy:
 - **Writing:** a file copied on the Amiga matches on the host.
 
 Both variants pass, and the boot menu was tested with an always-open build:
-both disks listed, Return boots normally, Esc mounts nothing. The real card
-hasn't run the ROM yet.
+both disks listed, Return boots normally, Esc mounts nothing.
+
+On the real card, the interrupt ROM (`MCROM-irq-27C512.bin`) passed the ROM
+driver test disk (`NODRIVER=1 STARTUP=disk/startup-rom-test ./mkadf.sh
+MCRomTest.adf`, no driver in `DEVS:`): probe, geometry, READ CAPACITY(16) and
+every devtest packet test, over the whole 6 GB BlueSCSI image. devtest read
+7018 / 6412 / 5227 KB/s for 512 / 128 / 32 KB, the best so far and 3.4% above
+M-Tec's driver at 512 KB; see `MCDevice/logs/mcrom-1-real-rom-irq.log`.
+
+`MC_COOP_US_PER_64K=500 ./build.sh` builds the cooperative ROM, which gave
+programs 4.6% CPU time during continuous reads in the earlier tests; the
+interrupt image then has 48 bytes free.
 
 Not done yet:
-- the boot ROM on the real card
+- booting from a partition and the boot menu on the real card
 - disks with other block sizes and LUNs above 0 at boot
 - disconnection
 - detecting medium changes without a command
