@@ -1071,6 +1071,26 @@ respectively `e199b264b99fba68e3298469f5faca7206659c0c` and
 `eee77ba688245a2fd0ea2f5b564bb902c3065202`; both contain the same benchmark,
 SHA-1 `4fe7789495db782254801ea9b541a80739b3881f`.
 
+The returned full-speed results are
+[`logs/cpu-64-memory-full-public-v34.log`](logs/cpu-64-memory-full-public-v34.log),
+[`logs/cpu-65-memory-full-fast-v34.log`](logs/cpu-65-memory-full-fast-v34.log),
+[`logs/cpu-66-memory-full-dma24-v34.log`](logs/cpu-66-memory-full-dma24-v34.log)
+and
+[`logs/cpu-67-memory-full-chip-v34.log`](logs/cpu-67-memory-full-chip-v34.log).
+The integrity test completed with 84 passed, no failures and the expected one
+BlueSCSI WRITE/READ BUFFER skip.
+
+| Requested class | Address | Actual flags | Throughput | CPU available |
+|---|---:|---:|---:|---:|
+| `PUBLIC` (`0x001`) | `0x0021CD58` | `0x605` | 6530 KiB/s | 0.0% |
+| `FAST` (`0x005`) | `0x0021D470` | `0x605` | 6511 KiB/s | 0.0% |
+| `DMA24` (`0x201`) | `0x0021D7B8` | `0x605` | 6508 KiB/s | 0.0% |
+| `CHIP` (`0x003`) | `0x00010EF0` | `0x703` | 5328 KiB/s | 0.0% |
+
+The tested full-speed ADF has SHA-1
+`acec67825d2718cc370ab2a81dc7b75e0e2887cd` and includes `mcdiag-mem.log` plus
+all four benchmark logs.
+
 The returned cooperative-memory results are
 [`logs/cpu-60-memory-coop-public-v34.log`](logs/cpu-60-memory-coop-public-v34.log),
 [`logs/cpu-61-memory-coop-fast-v34.log`](logs/cpu-61-memory-coop-fast-v34.log),
@@ -1086,14 +1106,17 @@ and
 | `CHIP` (`0x003`) | `0x00010EF0` | `0x703` | 5171 KiB/s | 3.8% |
 
 `0x605` identifies the same public, Fast, 24-bit-DMA and Kick-capable memory
-pool for the first three requests. Their 0.4% spread is run variation, so this
-machine currently gets the same buffer memory and performance from RDB-style
-values 1, 5 and 513. `CHIP` selected a genuinely different pool and was 16.6%
-slower than the three-pool average. Its fixed cooperative sleep occupies a
-smaller fraction of the longer transfer, explaining the lower 3.8% available
-CPU. The returned ADF had all four benchmark logs but no `mcdiag-mem.log`; its
-embedded cooperative driver is byte-identical to the already validated v33
-driver.
+pool for the first three requests. Their spread is only 0.3% at full speed and
+0.4% with cooperative pacing, which is run variation. This machine therefore
+gets the same buffer memory and performance from RDB-style values 1, 5 and 513.
+`CHIP` selected a genuinely different pool and was 18.2% slower than the
+three-pool average at full speed. It remained 16.7% slower with cooperative
+pacing. The cooperative profile reduced the Fast-pool result by about 4.7%
+while returning 4.6% of the CPU to applications. Its fixed sleep occupies a
+smaller fraction of the longer Chip-memory transfer, explaining the lower 3.8%
+available CPU there. The returned cooperative ADF had all four benchmark logs
+but no `mcdiag-mem.log`; its embedded driver is byte-identical to the already
+validated v33 driver.
 
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
