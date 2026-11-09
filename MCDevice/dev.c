@@ -44,6 +44,15 @@ __asm("  .text\n  moveq #-1,d0\n  rts\n");
 #define MC_MOUNT   0x7FF2       /* private, ROM build: add the partitions at start-up */
 #define TRIES      3
 
+/* Optional balanced profile: deliberately leave task time between completed
+   data requests. Zero compiles the pacing path out of production builds. */
+#ifndef MC_COOP_US_PER_64K
+#define MC_COOP_US_PER_64K 0
+#endif
+#if MC_COOP_US_PER_64K < 0
+#error MC_COOP_US_PER_64K must be zero or a positive integer
+#endif
+
 struct ExecBase *SysBase;
 struct Library *ExpansionBase;
 
@@ -538,6 +547,31 @@ static void perform(struct MC *mc, struct IOStdReq *ior)
     }
 }
 
+#if MC_COOP_US_PER_64K > 0
+static int is_data_command(UWORD command)
+{
+    switch (command) {
+    case CMD_READ:
+    case ETD_READ:
+    case CMD_WRITE:
+    case TD_FORMAT:
+    case ETD_WRITE:
+    case ETD_FORMAT:
+    case TD_READ64:
+    case NSCMD_TD_READ64:
+    case NSCMD_ETD_READ64:
+    case TD_WRITE64:
+    case TD_FORMAT64:
+    case NSCMD_TD_WRITE64:
+    case NSCMD_TD_FORMAT64:
+    case NSCMD_ETD_WRITE64:
+    case NSCMD_ETD_FORMAT64:
+        return 1;
+    }
+    return 0;
+}
+#endif
+
 /* ---- the task ---- */
 
 static void task_main(void)
@@ -546,6 +580,9 @@ static void task_main(void)
     struct MC *mc = me->tc_UserData;
     LONG psig = AllocSignal(-1), isig = AllocSignal(-1), tsig = AllocSignal(-1);
     struct MsgPort reqport;
+#if MC_COOP_US_PER_64K > 0
+    ULONG coop_remainder = 0;
+#endif
 
     if (psig < 0 || isig < 0 || tsig < 0)
         goto fail;
@@ -576,6 +613,19 @@ static void task_main(void)
         WaitPort(&reqport);
         while ((ior = (struct IOStdReq *)GetMsg(&reqport)) != 0) {
             perform(mc, ior);
+#if MC_COOP_US_PER_64K > 0
+            if (!ior->io_Error && ior->io_Actual &&
+                is_data_command(ior->io_Command)) {
+                ULONG quanta = ior->io_Actual >> 16;
+                coop_remainder += ior->io_Actual & 0xFFFF;
+                if (coop_remainder >= 0x10000) {
+                    coop_remainder -= 0x10000;
+                    quanta++;
+                }
+                if (quanta)
+                    mc_delay(mc, quanta * MC_COOP_US_PER_64K);
+            }
+#endif
             ReplyMsg(&ior->io_Message);
         }
     }

@@ -1,0 +1,21 @@
+; Read-only balanced-profile experiment: normal transfer loops plus an
+; intentional 500 us task sleep per accumulated 64 KiB of ordinary I/O.
+FailAt 21
+MakeDir RAM:T
+Assign T: RAM:T
+Echo "MCDevice cooperative 500 us/64K integrity test (read-only)."
+MCDiag TAKEOVER LOG RAM:mcdiag-c500.log
+Type RAM:mcdiag-c500.log >DF0:mcdiag-c500.log
+Echo "Measuring calibrated background CPU availability."
+MCCpuBench DEVICE mastercard.device UNIT 1 SECONDS 3 READSIZE 524288 LOG RAM:cpu-mc-c500.log
+Type RAM:cpu-mc-c500.log >DF0:cpu-mc-c500.log
+Echo "Measuring ordinary throughput without the worker."
+Echo "== cooperative 500 us/64K, devtest pass 1" >RAM:devtest-c500.log
+devtest -bb mastercard.device 1 >>RAM:devtest-c500.log
+Echo "== cooperative 500 us/64K, devtest pass 2" >>RAM:devtest-c500.log
+devtest -bb mastercard.device 1 >>RAM:devtest-c500.log
+Echo "== cooperative 500 us/64K, devtest pass 3" >>RAM:devtest-c500.log
+devtest -bb mastercard.device 1 >>RAM:devtest-c500.log
+Echo "== done" >>RAM:devtest-c500.log
+Type RAM:devtest-c500.log >DF0:devtest-c500.log
+Echo "Done: DF0:mcdiag-c500.log, cpu-mc-c500.log and devtest-c500.log"

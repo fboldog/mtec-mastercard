@@ -7,13 +7,14 @@ N=${NDK:-$HOME/amiga/AmigaOS/AmigaOS3.2/NDK3.2}
 : "${MC_CPU_MHZ:=42}"
 : "${MC_FAST_POLLS:=}"
 : "${MC_IRQ_ROUNDS:=}"
+: "${MC_COOP_US_PER_64K:=}"
 # DOCKER=image runs this same script in a toolchain container, for example
 #   DOCKER=stefanreinauer/amiga-gcc:gcc-v16.2 ./build.sh
 if [ -n "$DOCKER" ]; then
     R=$(cd .. && pwd)
     exec docker run --rm -u "$(id -u):$(id -g)" -v "$R:/w" -v "$N:/ndk:ro" -e NDK=/ndk \
         -e MC_CPU_MHZ="$MC_CPU_MHZ" -e MC_FAST_POLLS="$MC_FAST_POLLS" \
-        -e MC_IRQ_ROUNDS="$MC_IRQ_ROUNDS" \
+        -e MC_IRQ_ROUNDS="$MC_IRQ_ROUNDS" -e MC_COOP_US_PER_64K="$MC_COOP_US_PER_64K" \
         -w /w/MCDevice "$DOCKER" ./build.sh
 fi
 PATH=/opt/amiga/bin:$PATH
@@ -30,6 +31,9 @@ if [ -n "$MC_FAST_POLLS" ]; then
 fi
 if [ -n "$MC_IRQ_ROUNDS" ]; then
     TUNE_DEFS="$TUNE_DEFS -DMC_IRQ_ROUNDS=$MC_IRQ_ROUNDS"
+fi
+if [ -n "$MC_COOP_US_PER_64K" ]; then
+    TUNE_DEFS="$TUNE_DEFS -DMC_COOP_US_PER_64K=$MC_COOP_US_PER_64K"
 fi
 # Four disk variants, all named mastercard.device inside. Test variants retain
 # the private SDTR controls; production and ROM builds compile them out.

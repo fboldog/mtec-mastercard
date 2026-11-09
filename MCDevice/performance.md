@@ -1014,6 +1014,19 @@ Immediate task-context sleep therefore cannot recover the original driver's
 8% background time, and intermediate `MC_FAST_POLLS` values would only trade
 away part of this already negligible 0.2% gain.
 
+`MCTest-cpu-coop500-v33.adf` tests an explicit balanced profile instead of
+mislabeling interrupt time as idle. Its otherwise-normal production driver
+delays request completion by 500 microseconds per accumulated 64 KiB of
+successful ordinary read/write I/O. Accumulation avoids paying timer.device
+overhead on every small request. At the measured 6.5 MiB/s baseline, the
+requested delay is about 4.8% of transfer time, so the expected endpoint is
+roughly 5% real application CPU with a similar large-transfer throughput cost.
+This pacing is opt-in; the default value is zero and compiles to the established
+byte-identical production driver and ROM. The read-only v33 test saves
+`mcdiag-c500.log`, `cpu-mc-c500.log` and `devtest-c500.log`. Its SHA-1 is
+`04dfba407b1c9f4c9c89e76e3f485ea6c1418951`; its embedded driver is
+`eee77ba688245a2fd0ea2f5b564bb902c3065202`.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether
@@ -1057,6 +1070,13 @@ interrupt server before it returns. `MC_FAST_POLLS` must be positive. Normally
 `MC_IRQ_ROUNDS` is positive too; zero selects the experimental ready-entry
 first-gap return described above. The build script passes these settings to
 disk-loaded and ROM variants, and also preserves them when `DOCKER=...` is used.
+
+`MC_COOP_US_PER_64K` selects the optional cooperative profile. Zero is the
+production default. A positive value sleeps that many microseconds per
+accumulated 64 KiB of successful ordinary read/write I/O before replying to the
+request; for example, `MC_COOP_US_PER_64K=500 ./build.sh`. This is deliberate
+throughput-for-application-time pacing, not a reduction in the CPU cost of
+moving payload through the MasterCard data port.
 
 `MC_SYNC_DIAG=1` is intentionally used only by the disk diagnostic builds. ROM
 and `mastercard-prod-irq.device` compile out SDTR negotiation and automatic
