@@ -777,6 +777,31 @@ no synchronous-negotiation message. Its single warning for a read at sector
 one sector beyond the image's valid LBA range, and the resulting geometry still
 reports the correct 12582912-sector capacity.
 
+The matching TurboMax results are
+[`logs/mcdiag-43-hdf-turbomax-v27-read.log`](logs/mcdiag-43-hdf-turbomax-v27-read.log),
+[`logs/mcdiag-44-hdf-turbomax-v27-write.log`](logs/mcdiag-44-hdf-turbomax-v27-write.log)
+and
+[`MCTest-production-rw-v27-fast-tested-log.txt`](MCTest-production-rw-v27-fast-tested-log.txt).
+BlueSCSI confirms that `SpeedGrade=TurboMax` raised its system clock from 155
+to 250 MHz and SDIO from 26 to 50 MHz. The HDF, firmware, card and production
+driver remained unchanged. Both suites again completed at 84/0/1 and 103/0/1,
+with every write group restored.
+
+| Production async test | HDF default | HDF TurboMax | Change |
+|---|---:|---:|---:|
+| 512 KiB ordinary read | 5988 KiB/s | 6707 KiB/s | +12.0% |
+| 128 KiB ordinary read | 5620 KiB/s | 6235 KiB/s | +10.9% |
+| 32 KiB ordinary read | 4568 KiB/s | 5006 KiB/s | +9.6% |
+| 512 KiB DMA16 phase | 5725 KiB/s | 6509 KiB/s | +13.7% |
+| 512 KiB EXT24 phase | 5827 KiB/s | 6626 KiB/s | +13.7% |
+| 66048-byte DMA16 write/readback | 12.668 ms | 11.493 ms | -9.3% time |
+
+There is still no synchronous-negotiation message: the stripped production
+driver is asynchronous. The improvement therefore comes from the faster
+BlueSCSI target/SD backend, not Fast20 bus transfers. TurboMax is nevertheless
+a useful and so far stable production setting for this exact Pico 2, SD card
+and HDF configuration.
+
 ### Startup logging stall
 
 The normal log contains no unexplained command stall. Its longest deliberately

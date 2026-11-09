@@ -1,0 +1,44 @@
+Platform: BlueSCSI (Pico2/W)
+FW Version: 2026.08.17-rel Aug 17 2026 16:08:16
+Flash chip size: 4096 kB
+=== Bootloader Log ===
+[0ms] Bootloader version: Aug 17 2026 16:08:02 BlueSCSI
+[0ms] Looking for firmware: BlueSCSI_Pico_2_DaynaPORT*.bin
+[128ms] Bootloader continuing to main firmware
+=== End Bootloader Log ===
+Reclock Pico 2/2W based boards to standardized speed
+Initial Clock set to 150MHz
+Reclocking the MCU to 155MHz
+Setting the SDIO clock to 26MHz
+After reclocking, system reports clock set to 155MHz
+ 
+=== SD Card Info ===
+SD card detected, exFAT volume size: 30555 MB
+SD Name: JB1Q5, MID: 0x1B (Samsung), OID: "SM" (0x53 0x4D)
+-- SpeedGrade = TurboMax
+Speed grade set to TurboMax reclocking system
+Initial Clock set to 155MHz
+Reclocking the MCU to 250MHz
+Setting the SDIO clock to 50MHz
+After reclocking, system reports clock set to 250MHz
+======== Reinitializing BlueSCSI after reclock ========
+
+=== Global Config ===
+Reading configuration from bluescsi.ini
+-- SpeedGrade = TurboMax
+
+=== Finding images ===
+=== Finding images in / ===
+== Opening /HD1_512.hda for ID:1 LUN:0
+---- Configuring as disk drive
+
+== Platform supports ROM drive up to 2848 kB
+ 
+=== Configured SCSI Devices ===
+ID: 1, BlockSize: 512, Type: Fixed, Quirks: Apple, Size: 6291456kB
+
+Clock set to: 250MHz
+Initialization complete!
+Disabling status LED
+INFO: Pico Voltage: 3.291V.
+WARNING: Host attempted read at sector 12582912+1, exceeding image size 12582912 sectors (512B/sector)
