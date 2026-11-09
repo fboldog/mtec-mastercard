@@ -1,0 +1,17 @@
+MCCpuBench 0.2: mastercard.device unit 1, 512 KiB reads, worker priority -10
+Buffer request CHIP flags 00000003; address 00010EF0 actual flags 00000703
+Device version 0.1; EClock 709379 Hz
+Idle calibration for nominal 3 seconds...
+IDLE: 3019 ms, worker 11859200 units, 3928 units/ms
+READ pass 1:
+  34 commands, 3131 ms, 5559 KiB/s, worker 511104 units
+  APPLICATION CPU AVAILABLE: 4.1% (denied 95.9%)
+READ pass 2:
+  31 commands, 3162 ms, 5019 KiB/s, worker 465600 units
+  APPLICATION CPU AVAILABLE: 3.7% (denied 96.3%)
+READ pass 3:
+  30 commands, 3111 ms, 4937 KiB/s, worker 449472 units
+  APPLICATION CPU AVAILABLE: 3.7% (denied 96.3%)
+AVERAGE: 5171 KiB/s, application CPU available 3.8%
+The availability ratio counts completed worker instructions; interrupt
+time cannot be classified as idle merely because no task switch occurred.

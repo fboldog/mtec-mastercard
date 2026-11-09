@@ -1071,6 +1071,30 @@ respectively `e199b264b99fba68e3298469f5faca7206659c0c` and
 `eee77ba688245a2fd0ea2f5b564bb902c3065202`; both contain the same benchmark,
 SHA-1 `4fe7789495db782254801ea9b541a80739b3881f`.
 
+The returned cooperative-memory results are
+[`logs/cpu-60-memory-coop-public-v34.log`](logs/cpu-60-memory-coop-public-v34.log),
+[`logs/cpu-61-memory-coop-fast-v34.log`](logs/cpu-61-memory-coop-fast-v34.log),
+[`logs/cpu-62-memory-coop-dma24-v34.log`](logs/cpu-62-memory-coop-dma24-v34.log)
+and
+[`logs/cpu-63-memory-coop-chip-v34.log`](logs/cpu-63-memory-coop-chip-v34.log).
+
+| Requested class | Address | Actual flags | Throughput | CPU available |
+|---|---:|---:|---:|---:|
+| `PUBLIC` (`0x001`) | `0x0021CD58` | `0x605` | 6223 KiB/s | 4.6% |
+| `FAST` (`0x005`) | `0x0021D478` | `0x605` | 6201 KiB/s | 4.6% |
+| `DMA24` (`0x201`) | `0x0021D7C8` | `0x605` | 6199 KiB/s | 4.6% |
+| `CHIP` (`0x003`) | `0x00010EF0` | `0x703` | 5171 KiB/s | 3.8% |
+
+`0x605` identifies the same public, Fast, 24-bit-DMA and Kick-capable memory
+pool for the first three requests. Their 0.4% spread is run variation, so this
+machine currently gets the same buffer memory and performance from RDB-style
+values 1, 5 and 513. `CHIP` selected a genuinely different pool and was 16.6%
+slower than the three-pool average. Its fixed cooperative sleep occupies a
+smaller fraction of the longer transfer, explaining the lower 3.8% available
+CPU. The returned ADF had all four benchmark logs but no `mcdiag-mem.log`; its
+embedded cooperative driver is byte-identical to the already validated v33
+driver.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether
