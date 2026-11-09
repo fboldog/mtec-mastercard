@@ -869,6 +869,26 @@ not invoke MCDiag or replace the ROM driver. It records the original
 `mtecscsi.device` version, device/API/latency checks, and three `devtest -bb`
 passes against unit 1 to `DF0:mtec-rom.log`. It is read-only.
 
+The v28 results are
+[`logs/mtec-45-original-rom-turbomax-v28.log`](logs/mtec-45-original-rom-turbomax-v28.log)
+and
+[`MCTest-original-rom-benchmark-v28-tested-log.txt`](MCTest-original-rom-benchmark-v28-tested-log.txt).
+The BlueSCSI configuration matches v27: the same firmware, HDF and Samsung SD
+card with TurboMax at 250 MHz and 50 MHz SDIO. The three original-ROM passes
+averaged 6789, 6504 and 5350 KiB/s for 512, 128 and 32 KiB requests, versus
+MCDevice's 6707, 6235 and 5006 KiB/s. The original is therefore 1.2%, 4.3% and
+6.9% faster at those sizes. Its reported CPU load varied from 12-19%, stayed at
+1%, and varied from 3-4%, respectively. The repeatability proves that the low
+scheduler metric is characteristic of when its interrupt handler runs; it does
+not overturn the payload-copy analysis above.
+
+The result also quantifies the compatibility cost of the original 2.3 driver.
+It reports no `TD_GETGEOMETRY`, ETD, TD64 or NSD support, and its read-to-capacity
+search stops at sector 8388607: the 4 GiB boundary of this 6 GiB HDF. SCSI
+READ CAPACITY sees all 12582912 sectors, but normal device I/O cannot expose
+them. MCDevice is slightly slower but provides the full medium and modern
+device APIs.
+
 The Amiga ROM Kernel Reference Manual confirms the mechanism: interrupts run
 in supervisor mode on the common system stack, outside task-stack execution.
 Only when an interrupt is about to return to user mode does Exec check whether

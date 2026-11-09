@@ -1,0 +1,65 @@
+Original M-Tec ROM driver benchmark, unit 1.
+mtecscsi.device version 2.3
+  0 Unknown device type
+  1 QUANTUM  BlueSCSI Pico    1.0  Disk     512  6441 MB
+                 SSize TotalSectors    Cyl Head  Sect DType Removable
+TD_GETGEOMETRY       -            -     -     -     -  Fail -3  IOERR_NOCMD
+Inquiry                                                0x00 No
+READ_CAPACITY_10   512     12582912
+READ_CAPACITY_16   512     12582912
+Read-to capacity   512      8388607
+Mode Page 0x03     512                             48
+Mode Page 0x04                       16384   16
+Mode Page 0x0c len=22
+Mode Page 0x31 len=42
+TD_GETGEOMETRY     Fail -3  IOERR_NOCMD
+TD_CHANGENUM       Success  Count=1
+TD_CHANGESTATE     Success  Disk present
+TD_PROTSTATUS      Success  Unprotected
+TD_GETDRIVETYPE    Success  Type=0 Unknown
+TD_GETNUMTRACKS    Fail -3  IOERR_NOCMD
+TD_RAWREAD         Fail -3  IOERR_NOCMD
+CMD_UPDATE         Success
+SCSI command requires at least two arguments (len and cmd)
+SCSICMD Inquiry    Success  V='QUANTUM' P='BlueSCSI Pico' R='1.0' DT=0x0 Linked Sync
+SCSICMD TUR        Success  Ready
+NSCMD_DEVICEQUERY  Fail -3  IOERR_NOCMD
+CMD_READ           Success
+ETD_READ           Fail -3  IOERR_NOCMD
+TD_READ64          Fail -3  IOERR_NOCMD
+TD_SEEK            Success
+ETD_SEEK           Fail -3  IOERR_NOCMD
+TD_SEEK64          Fail -3  IOERR_NOCMD
+TD_MOTOR ON        Success
+TD_MOTOR OFF       Success
+== throughput pass 1
+Test mtecscsi.device 1 with Zorro II RAM
+read  512 KB xfers          6791 KB/sec (12% CPU)
+read  128 KB xfers          6491 KB/sec (1% CPU)
+read   32 KB xfers          5357 KB/sec (3% CPU)
+OpenDevice / CloseDevice    0.010 ms
+OpenDevice multiple         0.008 ms
+CloseDevice multiple        0.002 ms
+TD_GETGEOMETRY sequential     Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD0.003 ms
+TD_GETGEOMETRY parallel     0.005 ms
+== throughput pass 2
+Test mtecscsi.device 1 with Zorro II RAM
+read  512 KB xfers          6791 KB/sec (13% CPU)
+read  128 KB xfers          6484 KB/sec (1% CPU)
+read   32 KB xfers          5342 KB/sec (4% CPU)
+OpenDevice / CloseDevice    0.010 ms
+OpenDevice multiple         0.008 ms
+CloseDevice multiple        0.002 ms
+TD_GETGEOMETRY sequential     Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD0.003 ms
+TD_GETGEOMETRY parallel     0.005 ms
+== throughput pass 3
+Test mtecscsi.device 1 with Zorro II RAM
+read  512 KB xfers          6784 KB/sec (19% CPU)
+read  128 KB xfers          6536 KB/sec (1% CPU)
+read   32 KB xfers          5350 KB/sec (4% CPU)
+OpenDevice / CloseDevice    0.010 ms
+OpenDevice multiple         0.008 ms
+CloseDevice multiple        0.002 ms
+TD_GETGEOMETRY sequential     Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD  Fail -3  IOERR_NOCMD0.003 ms
+TD_GETGEOMETRY parallel     0.005 ms
+== done
