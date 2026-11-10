@@ -502,14 +502,14 @@ confirm it.
 | Image | Contents |
 |---|---|
 | `$0000`-`$003F` | Autoconfig data: the card's own manufacturer and product numbers, so the driver finds its board |
-| `$0040`-`$01FF` | Our DiagArea (`rom/diag.s`), nibble-wide |
-| `$0200`- | The driver, byte-wide, with a relocation table (`rom/pack.py`) |
+| `$0040`-`$02FF` | Our DiagArea (`rom/diag.s`), nibble-wide |
+| `$0300`- | The driver and its relocation table, compressed, byte-wide (`rom/pack.py`, `rom/lz.py`) |
 
 At boot:
 1. **Autoconfig:** expansion.library runs the DiagArea's DiagPoint.
-2. **Loading the driver:** DiagPoint copies the driver into RAM, relocates it, and
-   fills in the RomTag in the DiagArea from the driver's own, adding
-   `RTF_COLDSTART`.
+2. **Loading the driver:** DiagPoint unpacks the driver into RAM, straight from
+   the ROM, relocates it, and fills in the RomTag in the DiagArea from the
+   driver's own, adding `RTF_COLDSTART`.
 3. **Starting the driver:** exec starts it with the other residents, after
    timer.device and before dos.library.
 4. **Mounting:** the driver resets the bus and waits the 250 ms the SCSI standard
@@ -525,8 +525,11 @@ At boot:
    - stops the scan if the RDB has "last disk" set (`RDBFF_LAST` or
      `RDBFF_LASTTID`), so empty higher IDs cost no time: 250 ms each otherwise.
      amitools' `rdbtool` sets these flags on every RDB it makes, so clear them
-     on a disk that has others after it.
-5. **Booting:** BootPoint starts dos.library, which boots from the highest
+     on a disk that has others after it. With a CD file system available (see
+     below), the higher IDs are still probed, for CD-ROM drives only.
+5. **CDs:** a CD-ROM drive holding a bootable CD gets a CD0 boot node with boot
+   priority 2 (see [CD boot](#cd-boot)).
+6. **Booting:** BootPoint starts dos.library, which boots from the highest
    boot priority.
 
 **Boot menu:** holding the right mouse button at power-on opens it; both
@@ -534,7 +537,8 @@ buttons stay Kickstart's own Early Startup menu. The driver first finds the
 devices and reads their RDBs, then shows a table like CSA's: each device (SCSI
 ID, vendor and product, type, size), followed by its partitions (drive name,
 file system type such as `DOS\3` or `PFS\3`, boot priority, size), with `*` or
-`-` in the Mount and Boot columns. Up to 16 partitions are listed. **Boot**
+`-` in the Mount and Boot columns. Up to 16 partitions are listed; a CD-ROM drive with a bootable CD has `*`
+under Boot. **Boot**
 (Return) continues; **Skip card this boot** (Esc) leaves the card's partitions
 unmounted for this boot only.
 
@@ -553,10 +557,54 @@ extended count, and an interrupt ROM moves all data in the server. That saved
 about 2.3 KB. The relocation table uses 16-bit offsets, saving about 300 bytes
 more. `build.sh` compiles the ROM with GCC 16.2 from the
 `stefanreinauer/amiga-gcc:gcc-v16.2` container when Docker runs; `ROM_GCC=`
-builds it with the local toolchain. The interrupt ROM leaves 254 bytes free
-with GCC 16.2 (230 with the local GCC 15.2), and the polled one 380 (324). The disk drivers keep everything
-and the local toolchain; the production one is byte-identical to the validated
-build.
+builds it with the local toolchain. The disk drivers keep everything and the
+local toolchain.
+
+**Compression:** the driver and its relocation table are stored compressed, in
+a small LZ format of our own (`rom/lz.py`): literal runs and copies, lengths
+and offsets as interlaced Elias gamma codes, bit groups interleaved with the
+bytes. `pack.py` compresses with an optimal parse and checks that the result
+unpacks. The decoder in `diag.s` is about 70 bytes and reads the byte-wide ROM
+directly, so it needs no buffer; the relocation table is unpacked into what
+becomes the bss and cleared as it is applied. The driver moved from `$0200` to
+`$0300` to give the DiagArea room (290 of 352 bytes). With GCC 16.2 the
+interrupt ROM packs 16314 bytes into 11501 and leaves 4115 bytes free; the
+polled one 4275. Before compression the interrupt ROM had 254 bytes free.
+
+### CD boot
+
+The ROM has no room for a CD file system: the smallest candidates, the 3.2
+`CDFileSystem` (32.8 KB) and ODFileSystem's ROM build (30.2 KB), take about
+20 KB even compressed. The A4091 stores one in its 64 KB EPROM; this card
+reads only 16 KB. So the ROM boots a CD with a `CD01` file system that is
+already registered when it mounts:
+- **from a disk's RDB:** add `L:CDFileSystem` from the 3.2 Install disk (or
+  ODFileSystem) to the RDB of a disk on the card with DosType `0x43443031`
+  (HDToolBox, or `rdbtool fsadd ... fs=0x43443031`; `fs=CD01` gives
+  `CD\1`). The ROM loads it with the other RDB file systems, before the CDs;
+- **from Kickstart:** a module with a RomTag that registers `CD01` in
+  FileSystem.resource, such as ODFileSystem's ROM build, in a custom Kickstart.
+  The A1200 3.2 Kickstart has no CD file system and about 12 KB free.
+
+A CD boots if its ISO 9660 volume descriptor (sector 16) has `CDTV` or
+`AMIGA BOOT` as System ID, as CDTV, CD32 and AmigaOS 3.2 CDs do, and as the
+A4091 ROM requires. Other CDs are left to the system's own CD0. The node is
+CD0 (CD1 for a second drive), 2048-byte blocks, 20 buffers, boot priority 2,
+above the usual 0 of disk partitions; Kickstart's Early Startup menu can still
+pick another device. The stack size, priority and GlobVec come from the file
+system's entry. A drive that is still spinning up gets about 10 s; an empty
+drive costs nothing, since a command that gets "medium not present" now
+returns at once instead of retrying (also in the disk drivers).
+
+Tested in Amiberry, Kickstart 3.2 (47.115), the interrupt ROM, a disk at ID 1
+with FFS DH0 (boot priority 1) and `CDFileSystem` 47.26 in its RDB, a CD drive
+at ID 2:
+- the AmigaOS 3.2 CD boots into its Preinstallation Environment, also with
+  "last disk" set on the disk;
+- without the CD file system, with an empty drive, and with a non-bootable CD
+  (Amiga Developer CD 1.1, System ID `ANY SYSTEM`), DH0 boots and there is no
+  CD0;
+- the boot menu lists the drive as `CD-ROM` with `*` under Boot.
 
 Tested in Amiberry with Kickstart 3.1, from the ROM alone, no floppy:
 - **Booting:** from an FFS partition at 2.5-3.5 GB, with FFS 46 loaded from the
@@ -580,7 +628,7 @@ programs 4.6% CPU time during continuous reads in the earlier tests; the
 interrupt image then has 48 bytes free.
 
 Not done yet:
-- booting from a partition and the boot menu on the real card
+- booting from a partition, the boot menu and CD boot on the real card
 - disks with other block sizes and LUNs above 0 at boot
 - disconnection
 - detecting medium changes without a command

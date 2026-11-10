@@ -5,10 +5,11 @@
 
 DRIVER_HUNK is the driver linked with -DROM_BUILD, an Amiga executable.
 Its hunks are laid out one after another in a single memory block, the
-relocations turned into offsets into that block, and the result stored
-byte-wide at image $0200 (board $0400). DIAG is the DiagArea: diag.s,
-assembled here with the blob's board offset, or diag.o, already assembled
-with BLOBX=1024. It is stored nibble-wide at image $0040.
+relocations turned into offsets into that block, and the result, followed by
+the relocation table, compressed (lz.py) and stored byte-wide at image $0300
+(board $0600). DIAG is the DiagArea: diag.s, assembled here with the blob's
+board offset, or diag.o, already assembled with BLOBX=1536. It is stored
+nibble-wide at image $0040.
 OUT16 is the 16 KB image the card shows; OUT64 is the 27C512 image, the
 16 KB in all four quarters.
 
@@ -21,11 +22,13 @@ import subprocess
 import sys
 import tempfile
 
+import lz
+
 AS = "/opt/amiga/bin/m68k-amigaos-as"
 NM = "/opt/amiga/bin/m68k-amigaos-nm"
 ROM = 0x4000
 DA = 0x40
-BLOB = 0x200
+BLOB = 0x300
 
 # Expansion ROM: the card's own identity, so the driver finds its board.
 ER_TYPE = 0xD1          # Zorro II, DiagArea valid, 64 KB
@@ -121,9 +124,15 @@ def blob(path):
         fail("no RomTag in the driver")
     if total > 0xFFFF:
         fail("driver is over 64 KB, too big for 16-bit relocation offsets")
-    out = struct.pack(">4L", total, len(img), len(fix), tag) + img
-    out += b"".join(struct.pack(">H", p) for p in sorted(fix))
-    return out, total, len(fix)
+    data = bytes(img) + b"".join(struct.pack(">H", p) for p in sorted(fix))
+    packed = lz.compress(data)
+    if lz.decompress(packed, len(data)) != data:
+        fail("compression does not round-trip")
+    # The memory block also holds the relocation table while it is used;
+    # DiagPoint clears it after, for the bss.
+    mem = (max(total, len(data)) + 3) & ~3
+    out = struct.pack(">4L", mem, len(data), len(fix), tag) + packed
+    return out, total, len(fix), len(data)
 
 
 def diagarea(src, blobx):
@@ -172,7 +181,7 @@ def main():
     if len(sys.argv) != 5:
         fail("usage: pack.py DRIVER_HUNK DIAG_S OUT16 OUT64")
     drv, dsrc, out16, out64 = sys.argv[1:]
-    b, total, nfix = blob(drv)
+    b, total, nfix, raw = blob(drv)
     da = diagarea(dsrc, 2 * BLOB)
     if DA + 2 * len(da) > BLOB:
         fail("DiagArea is %d bytes, room for %d" % (len(da), (BLOB - DA) // 2))
@@ -186,8 +195,8 @@ def main():
     img[BLOB:BLOB + len(b)] = b
     open(out16, "wb").write(img)
     open(out64, "wb").write(bytes(img) * 4)
-    print("DiagArea %d bytes, driver %d bytes in memory, blob %d bytes with %d relocations, %d bytes free" %
-          (len(da), total, len(b), nfix, ROM - BLOB - len(b)))
+    print("DiagArea %d bytes, driver %d bytes in memory, %d bytes with %d relocations packed to %d, %d bytes free" %
+          (len(da), total, raw, nfix, len(b), ROM - BLOB - len(b)))
     for p in (out16, out64):
         print("%s sha1 %s" % (os.path.basename(p), hashlib.sha1(open(p, "rb").read()).hexdigest()))
 

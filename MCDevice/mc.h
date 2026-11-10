@@ -151,6 +151,7 @@ struct MCUnit {
     struct Interrupt *remove;   /* TD_REMOVE's interrupt, or 0 */
 #ifdef ROM_BUILD
     char ident[29];         /* vendor, product, revision from INQUIRY, for the boot menu */
+    UBYTE cdboot;           /* a bootable CD was in the drive at the boot menu's scan */
 #endif
 };
 

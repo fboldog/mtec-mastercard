@@ -178,6 +178,8 @@ static LONG scsi(struct MC *mc, struct MCUnit *u, UBYTE *cdb, UWORD cdblen, void
             LONG key = sense(mc, u);
             if (key != 0x06 && key != 0x02)
                 return HFERR_BadStatus;
+            if (key == 0x02 && mc->sense[12] == 0x3A)
+                return HFERR_BadStatus;     /* no medium: waiting won't help */
             if (key == 0x02)
                 mc_delay(mc, 500000);
         }

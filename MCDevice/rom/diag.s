@@ -2,17 +2,19 @@
 |
 | expansion.library copies this to RAM (da_Size bytes, from the nibble-wide
 | ROM) and calls DiagPoint with a0 = board, a2 = this copy, a3 = ConfigDev,
-| a6 = SysBase. DiagPoint copies the driver blob from the byte-wide ROM at
+| a6 = SysBase. DiagPoint unpacks the driver blob from the byte-wide ROM at
 | board offset BLOBX into new memory, adds the memory's address to every long
 | the relocation table names, and fills the RomTag below from the driver's own
 | (now relocated) RomTag, with RTF_COLDSTART added. expansion finds that
 | RomTag in the copy and exec starts the driver with the other residents.
 |
 | The blob, written by pack.py, is byte-wide on even board addresses, so
-| movep.l reads one long of it from 8 board bytes:
-|   0 memory size (code + data + bss)   4 image bytes   8 relocations
-|  12 RomTag offset                    16 image          ... relocation offsets,
-| one word each: the driver is far below 64 KB.
+| movep.l reads one long of its header from 8 board bytes:
+|   0 memory size (code + data + bss)   4 unpacked bytes   8 relocations
+|  12 RomTag offset                    16 packed data (rom/lz.py's format)
+| Unpacked, it is the image, then the relocation offsets, one word each: the
+| driver is far below 64 KB. The table ends up in what becomes the bss, so it
+| is cleared as it is used.
 
 	.text
 da:
@@ -35,33 +37,75 @@ BootPoint:
 	jsr	(a0)
 1:	rts
 
+| The next bit of the packed data, in the carry and X: bit groups of 8, used
+| from bit 7 down, with a marker bit shifted in behind them.
+getbit:
+	add.b	d7,d7
+	bne.s	1f
+	move.b	(a4),d7
+	addq.l	#2,a4
+	addx.b	d7,d7
+1:	rts
+
+| An interlaced Elias gamma number, in d0.
+gamma:
+	moveq	#1,d0
+1:	bsr.s	getbit
+	bcs.s	2f
+	bsr.s	getbit
+	addx.l	d0,d0
+	bra.s	1b
+2:	rts
+
 DiagPoint:
 	movem.l	d2-d7/a2-a6,-(sp)
 	lea	BLOBX(a0),a4
 	movep.l	0(a4),d0		| memory size
-	movep.l	8(a4),d6		| image bytes
+	movep.l	8(a4),d6		| unpacked bytes
 	movep.l	16(a4),d5		| relocations
 	movep.l	24(a4),d4		| RomTag offset
 	lea	32(a4),a4
 	move.l	#0x10001,d1		| MEMF_PUBLIC | MEMF_CLEAR
 	jsr	-198(a6)		| AllocMem
 	tst.l	d0
-	beq.s	9f
+	beq.w	9f
 	movea.l	d0,a5
 	movea.l	d0,a1
-	lsr.l	#2,d6
-	bra.s	2f
-1:	movep.l	0(a4),d1		| copy the image, a long at a time
-	move.l	d1,(a1)+
-	addq.l	#8,a4
-2:	dbf	d6,1b
-	move.l	a5,d2
-	bra.s	4f
-3:	moveq	#0,d1			| relocate: 16-bit offsets
-	movep.w	0(a4),d1
-	addq.l	#4,a4
+	lea	0(a5,d6.l),a2		| end of the unpacked data
+	moveq	#-128,d7		| no bits left
+1:	cmpa.l	a2,a1			| unpack
+	bcc.s	5f
+	bsr.s	getbit
+	bcs.s	3f
+	bsr.s	gamma			| 0: literal bytes
+2:	move.b	(a4),(a1)+
+	addq.l	#2,a4
+	subq.l	#1,d0
+	bne.s	2b
+	bra.s	1b
+3:	bsr.s	gamma			| 1: a copy, offset high byte + 1
+	subq.l	#1,d0
+	lsl.l	#8,d0
+	move.b	(a4),d0
+	addq.l	#2,a4
+	movea.l	a1,a3
+	suba.l	d0,a3
+	subq.l	#1,a3
+	bsr.s	gamma			| length - 1
+4:	move.b	(a3)+,(a1)+
+	subq.l	#1,d0
+	bcc.s	4b
+	bra.s	1b
+5:	move.l	a5,d2			| relocate
+	movea.l	a2,a0
+	suba.l	d5,a0
+	suba.l	d5,a0
+	bra.s	7f
+6:	moveq	#0,d1
+	move.w	(a0),d1
+	clr.w	(a0)+
 	add.l	d2,0(a5,d1.l)
-4:	dbf	d5,3b
+7:	dbf	d5,6b
 	jsr	-636(a6)		| CacheClearU
 	lea	0(a5,d4.l),a0		| the driver's RomTag
 	lea	rtag(pc),a1		| ours, in this RAM copy

@@ -79,7 +79,7 @@ ls -l mastercard.device mastercard-irq.device mastercard-sync-irq.device masterc
 # The boot ROM, in both variants: rom/MCROM[-irq]-16k.bin for the emulator,
 # rom/MCROM[-irq]-27C512.bin for the EPROM. Only our own code is in them.
 # The DiagArea (boot code) with the same toolchain; BLOBX = 2 * pack.py's BLOB.
-romas -m68020 --defsym BLOBX=1024 -o rom/diag.o rom/diag.s || exit 1
+romas -m68020 --defsym BLOBX=1536 -o rom/diag.o rom/diag.s || exit 1
 for V in ":" "-irq:-DIRQXFER"; do
     romcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
         -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-pointer-sign -Wno-array-bounds \

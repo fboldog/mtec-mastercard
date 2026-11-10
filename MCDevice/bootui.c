@@ -162,7 +162,7 @@ static int row(struct MC *mc, UWORD r, char cells[COLS][CELL], UBYTE end[COLS])
             end[0] = 1;
             cells[1][0] = '*';
             end[1] = 1;
-            cells[2][0] = boot ? '*' : '-';
+            cells[2][0] = boot || u->cdboot ? '*' : '-';
             end[2] = 1;
             end[3] = ident(cells[3], u->ident) - cells[3];
             end[4] = put(cells[4], type_name(u->type), 7) - cells[4];
