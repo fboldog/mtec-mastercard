@@ -5,8 +5,9 @@
  * CD01 file system registered gets this one: plain ISO 9660 names (";1" and
  * a trailing "." dropped, compared without case), directories, files, and
  * the packets DOS, the Shell and Workbench use to boot and read from it.
- * There is no Rock Ridge, Joliet, audio or disc-change handling, and nothing
- * can be written. Some of the ISO record handling follows ODFileSystem's
+ * Discs can be changed; a lock or file of a disc taken out waits for it to
+ * come back. There is no Rock Ridge, Joliet or audio, and nothing can be
+ * written. Some of the ISO record handling follows ODFileSystem's
  * backends/iso9660 (Copyright (c) 2026 Stefan Reinauer, BSD-2-Clause).
  *
  * It runs as the handler process DOS starts for CD0, from a seglist that
@@ -16,6 +17,8 @@
  */
 #include <dos/dos.h>
 #include <dos/dosextens.h>
+#include <devices/input.h>
+#include <devices/inputevent.h>
 
 struct DosLibrary *DOSBase;
 #include "gen/cdfsstubs.h"
@@ -30,6 +33,7 @@ struct Obj {
     ULONG rsec;
     UWORD roff;
     UWORD dir;
+    struct DosList *vol;        /* the disc it is on */
 };
 
 struct CLock {
@@ -49,9 +53,17 @@ struct CD {
     UBYTE *buf;                 /* one sector */
     ULONG bufsec;               /* which, or ~0 */
     struct Obj root;
-    struct DosList *vol;
+    struct DosList *vol;        /* the disc in the drive, or 0 */
     ULONG blocks;
-    UWORD locks;
+    UWORD locks;                /* locks and files on it */
+    UBYTE add, tried;           /* vol still to go on the DOS list; disc read */
+    struct DosList *old;        /* the last disc, kept while it has locks */
+    struct DosList *rem;        /* to take off the DOS list */
+    UWORD oldlocks;
+    ULONG changes;              /* TD_CHANGENUM when last looked */
+    struct MsgPort tport;
+    struct timerequest treq;    /* a look at the drive every second */
+    struct IOStdReq inp;        /* input.device, to tell Workbench */
 };
 
 static LONG cd_read(struct CD *c, ULONG sec, void *dst, ULONG len)
@@ -105,6 +117,7 @@ static UBYTE *dir_next(struct CD *c, struct Obj *o, ULONG *pos, struct Obj *foun
             continue;                           /* ".", "..", associated */
         if (found) {
             set_obj(found, r);
+            found->vol = o->vol;
             found->plba = o->lba;
             found->psize = o->size;
             found->rsec = sec;
@@ -239,7 +252,7 @@ static LONG examine(struct CD *c, struct Obj *o, struct FileInfoBlock *fib)
         fib->fib_Date = c->vol->dol_misc.dol_volume.dol_VolumeDate;
     } else {
         if (!o->rsec) {
-            struct Obj p = { o->plba, o->psize, 0, 0, 0, 0, 2 }, f;
+            struct Obj p = { o->plba, o->psize, 0, 0, 0, 0, 2, 0 }, f;
             ULONG pos = 0;
             while ((r = dir_next(c, &p, &pos, &f)) && f.lba != o->lba)
                 ;
@@ -316,6 +329,23 @@ static LONG file_read(struct CD *c, struct CFile *f, UBYTE *d, ULONG len, LONG *
     return done;
 }
 
+/* Whether o's disc is in the drive. */
+static LONG check(struct CD *c, struct Obj *o)
+{
+    return !c->vol ? ERROR_NO_DISK : o->vol != c->vol ? ERROR_DEVICE_NOT_MOUNTED : 0;
+}
+
+/* A lock or file is gone: an old disc's volume goes too with its last one. */
+static void release(struct CD *c, struct Obj *o)
+{
+    if (o->vol == c->vol)
+        c->locks--;
+    else if (o->vol == c->old && !--c->oldlocks) {
+        c->rem = c->old;
+        c->old = 0;
+    }
+}
+
 /* One packet; returns its first result, *err its second. */
 static LONG packet(struct CD *c, struct DosPacket *dp, LONG *err)
 {
@@ -330,7 +360,7 @@ static LONG packet(struct CD *c, struct DosPacket *dp, LONG *err)
         return MKBADDR(c->vol);
     case ACTION_LOCATE_OBJECT:
         o = *lock_obj(c, a1);
-        if ((*err = locate(c, &o, (UBYTE *)BADDR(a2))))
+        if ((*err = check(c, &o)) || (*err = locate(c, &o, (UBYTE *)BADDR(a2))))
             return 0;
         return new_lock(c, &o, a3);
     case ACTION_COPY_DIR:
@@ -338,18 +368,20 @@ static LONG packet(struct CD *c, struct DosPacket *dp, LONG *err)
             return 0;
         /* fall through */
     case ACTION_COPY_DIR_FH:
-        return new_lock(c, dp->dp_Type == ACTION_COPY_DIR ? lock_obj(c, a1) : &((struct CFile *)a1)->o,
-                        SHARED_LOCK);
+        o = dp->dp_Type == ACTION_COPY_DIR ? *lock_obj(c, a1) : ((struct CFile *)a1)->o;
+        if ((*err = check(c, &o)))
+            return 0;
+        return new_lock(c, &o, SHARED_LOCK);
     case ACTION_FREE_LOCK:
         if (a1) {
+            release(c, lock_obj(c, a1));
             FreeMem(BADDR(a1), sizeof(struct CLock));
-            c->locks--;
         }
         return DOSTRUE;
     case ACTION_PARENT:
     case ACTION_PARENT_FH:
         o = dp->dp_Type == ACTION_PARENT ? *lock_obj(c, a1) : ((struct CFile *)a1)->o;
-        if (!up(c, &o))
+        if ((*err = check(c, &o)) || !up(c, &o))
             return 0;                           /* the root has none */
         return new_lock(c, &o, SHARED_LOCK);
     case ACTION_SAME_LOCK:
@@ -357,7 +389,7 @@ static LONG packet(struct CD *c, struct DosPacket *dp, LONG *err)
     case ACTION_EXAMINE_OBJECT:
     case ACTION_EXAMINE_FH:
         o = dp->dp_Type == ACTION_EXAMINE_OBJECT ? *lock_obj(c, a1) : ((struct CFile *)a1)->o;
-        if ((*err = examine(c, &o, (struct FileInfoBlock *)BADDR(a2))))
+        if ((*err = check(c, &o)) || (*err = examine(c, &o, (struct FileInfoBlock *)BADDR(a2))))
             return DOSFALSE;
         if (dp->dp_Type == ACTION_EXAMINE_OBJECT && a1)
             lock_obj(c, a1)->rsec = o.rsec, lock_obj(c, a1)->roff = o.roff;
@@ -367,6 +399,8 @@ static LONG packet(struct CD *c, struct DosPacket *dp, LONG *err)
         ULONG pos = fib->fib_DiskKey;
         UBYTE *r;
         o = *lock_obj(c, a1);
+        if ((*err = check(c, &o)))
+            return DOSFALSE;
         if (!o.dir || !(r = dir_next(c, &o, &pos, 0))) {
             *err = ERROR_NO_MORE_ENTRIES;
             return DOSFALSE;
@@ -380,7 +414,8 @@ static LONG packet(struct CD *c, struct DosPacket *dp, LONG *err)
         struct FileHandle *fh = (struct FileHandle *)BADDR(a1);
         struct CFile *f;
         o = *lock_obj(c, a2);
-        if (dp->dp_Type == ACTION_FINDINPUT && (*err = locate(c, &o, (UBYTE *)BADDR(a3))))
+        if ((*err = check(c, &o)) ||
+            (dp->dp_Type == ACTION_FINDINPUT && (*err = locate(c, &o, (UBYTE *)BADDR(a3)))))
             return DOSFALSE;
         if (o.dir) {
             *err = ERROR_OBJECT_WRONG_TYPE;
@@ -392,17 +427,21 @@ static LONG packet(struct CD *c, struct DosPacket *dp, LONG *err)
         }
         f->o = o;
         fh->fh_Arg1 = (LONG)f;
-        if (dp->dp_Type == ACTION_FH_FROM_LOCK) {
-            FreeMem(BADDR(a2), sizeof(struct CLock));
-            c->locks--;
-        }
+        if (dp->dp_Type == ACTION_FH_FROM_LOCK)
+            FreeMem(BADDR(a2), sizeof(struct CLock));       /* the file takes its count */
+        else
+            c->locks++;
         return DOSTRUE;
     }
     case ACTION_READ:
+        if ((*err = check(c, &((struct CFile *)a1)->o)))
+            return -1;
         return file_read(c, (struct CFile *)a1, (UBYTE *)a2, a3, err);
     case ACTION_SEEK: {
         struct CFile *f = (struct CFile *)a1;
         LONG old = f->pos, to = a2 + (a3 == OFFSET_BEGINNING ? 0 : a3 == OFFSET_END ? (LONG)f->o.size : old);
+        if ((*err = check(c, &f->o)))
+            return -1;
         if (to < 0 || (ULONG)to > f->o.size) {
             *err = ERROR_SEEK_ERROR;
             return -1;
@@ -411,6 +450,7 @@ static LONG packet(struct CD *c, struct DosPacket *dp, LONG *err)
         return old;
     }
     case ACTION_END:
+        release(c, &((struct CFile *)a1)->o);
         FreeMem((APTR)a1, sizeof(struct CFile));
         return DOSTRUE;
     case ACTION_INFO:
@@ -422,7 +462,7 @@ static LONG packet(struct CD *c, struct DosPacket *dp, LONG *err)
         id->id_DiskState = ID_WRITE_PROTECTED;
         id->id_NumBlocks = id->id_NumBlocksUsed = c->blocks;
         id->id_BytesPerBlock = SECTOR;
-        id->id_DiskType = ID_DOS_DISK;
+        id->id_DiskType = c->vol ? ID_DOS_DISK : ID_NO_DISK_PRESENT;
         id->id_VolumeNode = MKBADDR(c->vol);
         id->id_InUse = c->locks;
         return DOSTRUE;
@@ -456,6 +496,128 @@ static UBYTE *pvd(struct CD *c)
     return 0;
 }
 
+/* Tells Workbench a disc came or went. */
+static void event(struct CD *c, UBYTE cls)
+{
+    struct InputEvent ie;
+    if (!c->inp.io_Device)
+        return;
+    memset(&ie, 0, sizeof ie);
+    ie.ie_Class = cls;
+    c->inp.io_Command = IND_WRITEEVENT;
+    c->inp.io_Data = &ie;
+    c->inp.io_Length = sizeof ie;
+    DoIO((struct IORequest *)&c->inp);
+}
+
+/* The disc in the drive: its volume, or the last disc's again if it is the
+   same one (same name and date), so its locks work again. */
+static void mount(struct CD *c)
+{
+    struct DosList *v;
+    struct DateStamp ds;
+    UBYTE *p, *on;
+    char name[33];
+    int k, n = 0;
+    c->bufsec = ~0UL;
+    if (!(p = pvd(c)))
+        return;
+    set_obj(&c->root, p + 156);
+    c->blocks = BE32(p + 84);
+    for (k = 0; k < 32; k++)                    /* volume ID, without trailing spaces */
+        if ((name[k] = p[40 + k]) != ' ' && name[k])
+            n = k + 1;
+    if (!n)
+        name[n++] = 'C', name[n++] = 'D';       /* no volume ID */
+    name[n] = 0;
+    iso_date(p + 156 + 18, &ds);
+    if ((v = c->old) && (on = (UBYTE *)BADDR(v->dol_Name))[0] == n && same(on + 1, name, n) &&
+        same((UBYTE *)&v->dol_misc.dol_volume.dol_VolumeDate, (char *)&ds, sizeof ds)) {
+        c->old = 0;
+        c->locks = c->oldlocks;
+    } else {
+        if (!(v = (struct DosList *)MakeDosEntry((STRPTR)name, DLT_VOLUME)))
+            return;
+        v->dol_misc.dol_volume.dol_DiskType = ID_DOS_DISK;
+        v->dol_misc.dol_volume.dol_VolumeDate = ds;
+        c->add = 1;
+        c->locks = 0;
+    }
+    v->dol_Task = c->port;
+    c->vol = c->root.vol = v;
+    event(c, IECLASS_DISKINSERTED);
+}
+
+/* The disc went: its volume stays, not mounted, while it has locks. */
+static void unmount(struct CD *c)
+{
+    struct DosList *v = c->vol;
+    v->dol_Task = 0;
+    c->vol = c->root.vol = 0;
+    if (c->locks) {
+        c->old = v;                             /* an older one stays as it is */
+        c->oldlocks = c->locks;
+    } else
+        c->rem = v;
+    event(c, IECLASS_DISKREMOVED);
+}
+
+/* Volumes on and off the DOS list, when it is free: a handler must not
+   wait for it, DOS may be waiting for us. */
+static void dos_list(struct CD *c)
+{
+    if ((c->add || c->rem) && (ULONG)AttemptLockDosList(LDF_VOLUMES | LDF_WRITE) > 1) {
+        if (c->rem) {
+            RemDosEntry(c->rem);
+            FreeDosEntry(c->rem);
+            c->rem = 0;
+        }
+        if (c->add) {
+            AddDosEntry(c->vol);
+            c->add = 0;
+        }
+        UnLockDosList(LDF_VOLUMES | LDF_WRITE);
+    }
+}
+
+/* Every second: a disc out, a new one in. */
+static void poll(struct CD *c)
+{
+    int in;
+    if (c->add || c->rem)
+        return;                                 /* the DOS list first */
+    c->io.io_Command = TD_CHANGESTATE;
+    in = !DoIO((struct IORequest *)&c->io) && !c->io.io_Actual;
+    c->io.io_Command = TD_CHANGENUM;
+    DoIO((struct IORequest *)&c->io);
+    if (!in || c->io.io_Actual != c->changes) {
+        if (c->vol)
+            unmount(c);
+        c->changes = c->io.io_Actual;
+        c->tried = 0;
+    }
+    if (in && !c->vol && !c->tried) {
+        c->tried = 1;
+        mount(c);
+    }
+}
+
+static void tick(struct CD *c)
+{
+    c->treq.tr_node.io_Command = TR_ADDREQUEST;
+    c->treq.tr_time.tv_secs = 1;
+    c->treq.tr_time.tv_micro = 0;
+    SendIO((struct IORequest *)&c->treq);
+}
+
+static void init_port(struct MsgPort *mp, struct Task *me)
+{
+    mp->mp_Node.ln_Type = NT_MSGPORT;
+    mp->mp_SigBit = AllocSignal(-1);
+    mp->mp_SigTask = me;
+    NewList(&mp->mp_MsgList);
+}
+
 /* The handler process. DOS sends the startup packet first. */
 static void cdfs_main(void)
 {
@@ -465,9 +627,6 @@ static void cdfs_main(void)
     struct FileSysStartupMsg *fssm;
     struct DeviceNode *dn;
     struct Message *m;
-    UBYTE *p;
-    char name[33];
-    int k, n, added = 0;
 
     memset(c, 0, sizeof cd);
     c->port = &me->pr_MsgPort;
@@ -477,59 +636,41 @@ static void cdfs_main(void)
     fssm = (struct FileSysStartupMsg *)BADDR(dp->dp_Arg2);
     dn = (struct DeviceNode *)BADDR(dp->dp_Arg3);
 
-    c->ioport.mp_Node.ln_Type = NT_MSGPORT;
-    c->ioport.mp_SigBit = AllocSignal(-1);
-    c->ioport.mp_SigTask = me;
-    NewList(&c->ioport.mp_MsgList);
-    c->io.io_Message.mn_ReplyPort = &c->ioport;
-    c->io.io_Message.mn_Length = sizeof c->io;
-    c->bufsec = ~0UL;
+    init_port(&c->ioport, &me->pr_Task);
+    init_port(&c->tport, &me->pr_Task);
+    c->io.io_Message.mn_ReplyPort = c->inp.io_Message.mn_ReplyPort = &c->ioport;
+    c->treq.tr_node.io_Message.mn_ReplyPort = &c->tport;
     if (!(DOSBase = (struct DosLibrary *)OpenLibrary((STRPTR)"dos.library", 36)) ||
         !(c->buf = (UBYTE *)AllocMem(SECTOR, MEMF_PUBLIC)) ||
         OpenDevice((STRPTR)dev_name, fssm->fssm_Unit, (struct IORequest *)&c->io, 0) ||
-        !(p = pvd(c)) ||
-        !(set_obj(&c->root, p + 156), c->blocks = BE32(p + 84), 1)) {
-        reply(c, dp, DOSFALSE, ERROR_NOT_A_DOS_DISK);
-        return;                                 /* resources stay: this is the boot disc */
+        OpenDevice((STRPTR)timer_name, UNIT_VBLANK, (struct IORequest *)&c->treq, 0)) {
+        reply(c, dp, DOSFALSE, ERROR_NO_FREE_STORE);
+        return;                                 /* resources stay: this is rare */
     }
-    for (n = 0, k = 0; k < 32; k++)             /* volume ID, without trailing spaces */
-        if ((name[k] = p[40 + k]) != ' ' && name[k])
-            n = k + 1;
-    if (!n)
-        name[n++] = 'C', name[n++] = 'D';       /* no volume ID */
-    name[n] = 0;
-    c->vol = (struct DosList *)MakeDosEntry((STRPTR)name, DLT_VOLUME);
-    if (c->vol) {
-        c->vol->dol_Task = c->port;
-        c->vol->dol_misc.dol_volume.dol_DiskType = ID_DOS_DISK;
-        iso_date(p + 156 + 18, &c->vol->dol_misc.dol_volume.dol_VolumeDate);
-    }
+    OpenDevice((STRPTR)"input.device", 0, (struct IORequest *)&c->inp, 0);
+    if (c->inp.io_Error)
+        c->inp.io_Device = 0;
+    c->io.io_Command = TD_CHANGENUM;
+    DoIO((struct IORequest *)&c->io);
+    c->changes = c->io.io_Actual;
+    c->tried = 1;
+    mount(c);
     dn->dn_Task = c->port;
-    reply(c, dp, c->vol ? DOSTRUE : DOSFALSE, c->vol ? 0 : ERROR_NO_FREE_STORE);
-    if (!c->vol)
-        return;
-
+    reply(c, dp, DOSTRUE, 0);
+    tick(c);
     for (;;) {
-        /* The volume goes on the DOS list once the list is free: a handler
-           must not wait for it, DOS may be waiting for us. */
-        if (!added) {
-            ULONG l = (ULONG)AttemptLockDosList(LDF_VOLUMES | LDF_WRITE);
-            if (l > 1) {
-                AddDosEntry(c->vol);
-                UnLockDosList(LDF_VOLUMES | LDF_WRITE);
-                added = 1;
-            }
-        }
-        if (added)
-            WaitPort(c->port);
+        dos_list(c);
+        Wait(1UL << c->port->mp_SigBit | 1UL << c->tport.mp_SigBit);
         while ((m = (struct Message *)GetMsg(c->port))) {
             LONG err = 0, r;
             dp = (struct DosPacket *)m->mn_Node.ln_Name;
             r = packet(c, dp, &err);
             reply(c, dp, r, err);
         }
-        if (!added)
-            Delay(1);
+        if (GetMsg(&c->tport)) {
+            poll(c);
+            tick(c);
+        }
     }
 }
 

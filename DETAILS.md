@@ -609,16 +609,23 @@ caller's buffer, directories and the ends of reads through one cached sector.
   volume ID is blank), read-only protection bits (`---ar-e-`, as
   `CDFileSystem` shows), extended attribute records (the data starts after
   them).
+- **Disc changes:** every second it asks the drive (`TD_CHANGESTATE`, a TEST
+  UNIT READY, and `TD_CHANGENUM`). A disc taken out leaves the DOS list, or
+  stays as a volume that isn't mounted while it has locks or open files; a
+  new one is mounted. The last disc's volume comes back with its locks when
+  the same disc (same name and date) is put in again, so the boot CD can be
+  taken out and put back. Locks of a disc that isn't in get "device not
+  mounted", with no disc "no disk". Workbench is told with input events, so
+  the icons follow. This costs 711 bytes of the ROM (1208 unpacked).
 - **Doesn't:** Rock Ridge, Joliet, audio, multisession (it reads the first
-  session), multi-extent or interleaved files, time zones, disc changes,
-  writing (refused as write-protected). Enough to install AmigaOS 3.2 from its
-  CD without floppies.
+  session), multi-extent or interleaved files, time zones, writing (refused as
+  write-protected). Enough to install AmigaOS 3.2 from its CD without floppies.
 - Some of its ISO record handling follows ODFileSystem's `backends/iso9660`
   (BSD-2-Clause, Copyright (c) 2026 Stefan Reinauer); a path's `vol:` or
   `assign:` is skipped and the lock DOS passes kept, as ODFileSystem does.
 
-With it the interrupt ROM packs 20238 bytes into 14345 and has 1271 bytes free
-(polled 1430).
+With it the interrupt ROM packs 21450 bytes into 15058 and has 558 bytes free
+(polled 716).
 
 Tested in Amiberry, Kickstart 3.2 (47.115), the interrupt ROM, a disk at ID 1
 with FFS DH0 and a CD drive with the AmigaOS 3.2 CD at ID 2:
@@ -634,6 +641,14 @@ with FFS DH0 and a CD drive with the AmigaOS 3.2 CD at ID 2:
 - a copy of the 3.2 ISO with a boot record at sector 16 (the primary
   descriptor at 17), a blank volume ID and a 1-block extended attribute record
   on `S/Startup-Sequence` boots the same, with the volume named `CD`;
+- **disc changes**, with the emulator's CD swapped at run time: from a Shell
+  with its current directory on `CD0:Libs`, the CD out leaves CD0 with no disc
+  and the volume not mounted; another disc in mounts as a new volume
+  (`dir cd0:s` lists it); the 3.2 CD back makes the current directory work
+  again; with the lock gone, the CD out takes the volume off the list. Booted
+  from the CD into the Preinstallation Environment, the boot CD out, another
+  disc in (its icon appears), the boot CD back: `NewShell`, `dir sys:libs` and
+  `version sys:libs/workbench.library` work from it again;
 - with an empty drive and with a non-bootable CD (Amiga Developer CD 1.1,
   System ID `ANY SYSTEM`) DH0 boots and there is no CD0;
 - the boot menu lists the drive as `CD-ROM` with `*` under Boot.
