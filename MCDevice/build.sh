@@ -48,6 +48,8 @@ python3 ../MTecPatch/gen/genstubs.py "$N" \
     graphics=GfxBase:SetAPen,Move,Draw,Text,TextLength \
     gadtools=GadToolsBase:GetVisualInfoA,FreeVisualInfo,CreateContext,CreateGadgetA,FreeGadgets,GT_GetIMsg,GT_ReplyIMsg,GT_RefreshWindow,GT_BeginRefresh,GT_EndRefresh,DrawBevelBoxA \
     > gen/bootstubs.h || exit 1
+python3 ../MTecPatch/gen/genstubs.py "$N" \
+    dos=DOSBase:MakeDosEntry,AddDosEntry,AttemptLockDosList,UnLockDosList,Delay > gen/cdfsstubs.h || exit 1
 # NewList is a macro in amiga.lib, which isn't linked.
 # MC_CPU_MHZ scales the default short task-context interrupt poll. The two
 # explicit values are useful for reproducible tuning builds.

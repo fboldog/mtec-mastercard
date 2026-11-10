@@ -37,9 +37,10 @@ test history and the patched M-Tec ROM, is in [DETAILS.md](DETAILS.md).
 - **Start-up:** waits up to 10 s for a drive that is still spinning up, and
   skips empty SCSI IDs after a disk whose RDB has "last disk" set.
 - **CD boot:** boots a bootable CD, such as the AmigaOS 3.2 CD, from a SCSI
-  CD-ROM drive, with a CD file system stored in a disk's RDB or in Kickstart.
-  The ROM's contents are compressed to make room. Tested in Amiberry; see
-  [DETAILS.md](DETAILS.md#cd-boot).
+  CD-ROM drive. A small read-only ISO 9660 file system is built into the ROM;
+  a CD file system in a disk's RDB or in Kickstart is used instead when there
+  is one. The ROM's contents are compressed to make room. Tested in Amiberry;
+  see [DETAILS.md](DETAILS.md#cd-boot).
 
 **The boot menu:** hold the right mouse button at power-on. It lists the
 devices and their partitions, and can skip the card's partitions for one boot.

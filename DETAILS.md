@@ -573,59 +573,75 @@ polled one 4275. Before compression the interrupt ROM had 254 bytes free.
 
 ### CD boot
 
-The ROM has no room for a CD file system: the smallest candidates, the 3.2
-`CDFileSystem` (32.8 KB) and ODFileSystem's ROM build (30.2 KB), take about
-20 KB even compressed. The A4091 stores one in its 64 KB EPROM; this card
-reads only 16 KB. So the ROM boots a CD with a `CD01` file system that is
-already registered when it mounts:
+A full CD file system doesn't fit: the 3.2 `CDFileSystem` is 32.8 KB, and
+ODFileSystem's ROM build is 30.2 KB, still 27.7 KB with only ISO 9660 enabled
+(about 18.8 KB compressed). The A4091 stores one in its 64 KB EPROM; this card
+reads only 16 KB. So the ROM has its own small one, `MCDevice/cdfs.c`, and
+uses a registered `CD01` file system instead when there is one:
 - **from a disk's RDB:** add `L:CDFileSystem` from the 3.2 Install disk (or
   ODFileSystem) to the RDB of a disk on the card with DosType `0x43443031`
   (HDToolBox, or `rdbtool fsadd ... fs=0x43443031`; `fs=CD01` gives
   `CD\1`). The ROM loads it with the other RDB file systems, before the CDs;
+  avoid the `CDFileSystem` 48.57 from Update 3.2.3;
 - **from Kickstart:** a module with a RomTag that registers `CD01` in
   FileSystem.resource, such as ODFileSystem's ROM build, in a custom Kickstart.
   The A1200 3.2 Kickstart has no CD file system and about 12 KB free.
 
-A CD boots if its ISO 9660 volume descriptor (sector 16) has `CDTV` or
+A CD boots if its primary ISO 9660 volume descriptor (the first of type 1 from
+sector 16; a boot record may come before it) has `CDTV` or
 `AMIGA BOOT` as System ID, as CDTV, CD32 and AmigaOS 3.2 CDs do, and as the
 A4091 ROM requires. Other CDs are left to the system's own CD0. The node is
-CD0 (CD1 for a second drive), 2048-byte blocks, 20 buffers, boot priority 2,
-above the usual 0 of disk partitions; Kickstart's Early Startup menu can still
-pick another device. The stack size, priority and GlobVec come from the file
-system's entry. A drive that is still spinning up gets about 10 s; an empty
+CD0 (CD1 for a second drive), 2048-byte blocks, boot priority 2, above the
+usual 0 of disk partitions; Kickstart's Early Startup menu can still pick
+another device. A drive that is still spinning up gets about 10 s; an empty
 drive costs nothing, since a command that gets "medium not present" now
-returns at once instead of retrying (also in the disk drivers).
+returns at once instead of retrying (also in the disk drivers). After a
+"last disk", the higher IDs are still probed, for CD-ROM drives only.
+
+**The built-in file system** (`cdfs.c`, about 3.8 KB, 2.8 KB packed) is a DOS
+handler process, started by DOS from a seglist that jumps into the driver. It
+reads through mastercard.device with `DoIO`: whole sectors straight into the
+caller's buffer, directories and the ends of reads through one cached sector.
+- **Supports:** plain ISO 9660 names (`;1` and a trailing `.` dropped,
+  compared without case, up to 106 characters), directories, files, dates;
+  locking, examining (`ExAll` is left to DOS's emulation), opening, reading,
+  seeking, parents, `Info`, the volume on the DOS list (named `CD` if the
+  volume ID is blank), read-only protection bits (`---ar-e-`, as
+  `CDFileSystem` shows), extended attribute records (the data starts after
+  them).
+- **Doesn't:** Rock Ridge, Joliet, audio, multisession (it reads the first
+  session), multi-extent or interleaved files, time zones, disc changes,
+  writing (refused as write-protected). Enough to install AmigaOS 3.2 from its
+  CD without floppies.
+- Some of its ISO record handling follows ODFileSystem's `backends/iso9660`
+  (BSD-2-Clause, Copyright (c) 2026 Stefan Reinauer); a path's `vol:` or
+  `assign:` is skipped and the lock DOS passes kept, as ODFileSystem does.
+
+With it the interrupt ROM packs 20238 bytes into 14345 and has 1271 bytes free
+(polled 1430).
 
 Tested in Amiberry, Kickstart 3.2 (47.115), the interrupt ROM, a disk at ID 1
-with FFS DH0 (boot priority 1) and `CDFileSystem` 47.26 in its RDB, a CD drive
-at ID 2:
-- the AmigaOS 3.2 CD boots into its Preinstallation Environment, also with
-  "last disk" set on the disk;
-- without the CD file system, with an empty drive, and with a non-bootable CD
-  (Amiga Developer CD 1.1, System ID `ANY SYSTEM`), DH0 boots and there is no
-  CD0;
+with FFS DH0 and a CD drive with the AmigaOS 3.2 CD at ID 2:
+- **with the built-in file system** (no `CD01` anywhere): the CD boots into
+  its Preinstallation Environment. Booted from the disk instead (DH0 at
+  priority 5), with the 3.2 commands from the CD: `workbench.library`, the
+  900 KB `ADF/Install3.2.adf` and all 54 files of `C/` copied to DH0 match the
+  ISO byte for byte, `List CD0:GlowIconsCollection ALL` gives all 2941 entries
+  (2353 files, 588 directories) with the ISO's sizes, `CD /` from `CD0:Libs`
+  returns to the root, `Info` shows the 74 MB read-only volume;
+- **with `CDFileSystem` 47.26 in the disk's RDB:** the CD boots with it, also
+  with "last disk" set on the disk;
+- a copy of the 3.2 ISO with a boot record at sector 16 (the primary
+  descriptor at 17), a blank volume ID and a 1-block extended attribute record
+  on `S/Startup-Sequence` boots the same, with the volume named `CD`;
+- with an empty drive and with a non-bootable CD (Amiga Developer CD 1.1,
+  System ID `ANY SYSTEM`) DH0 boots and there is no CD0;
 - the boot menu lists the drive as `CD-ROM` with `*` under Boot.
 
-Tested in Amiberry with Kickstart 3.1, from the ROM alone, no floppy:
-- **Booting:** from an FFS partition at 2.5-3.5 GB, with FFS 46 loaded from the
-  RDB.
-- **A second file system:** a PFS3 partition, with pfs3aio loaded from the RDB,
-  mounted read/write.
-- **Writing:** a file copied on the Amiga matches on the host.
-
-Both variants pass, and the boot menu was tested with an always-open build:
-both disks listed, Return boots normally, Esc mounts nothing.
-
-On the real card, the interrupt ROM (`MCROM-irq-27C512.bin`) passed the ROM
-driver test disk (`NODRIVER=1 STARTUP=disk/startup-rom-test ./mkadf.sh
-MCRomTest.adf`, no driver in `DEVS:`): probe, geometry, READ CAPACITY(16) and
-every devtest packet test, over the whole 6 GB BlueSCSI image. devtest read
-7018 / 6412 / 5227 KB/s for 512 / 128 / 32 KB, the best so far and 3.4% above
-M-Tec's driver at 512 KB; see `MCDevice/logs/mcrom-1-real-rom-irq.log`.
-
-`MC_COOP_US_PER_64K=500 ./build.sh` builds the cooperative ROM, which gave
-programs 4.6% CPU time during continuous reads in the earlier tests; the
-interrupt image then has 48 bytes free.
+The `List` from the 3.0 install disk counts wrongly on Kickstart 3.2 with CD
+file systems that leave `ExAll` to DOS, and crashes with its output redirected
+(`#8700000E`); it does the same with `CDFileSystem` 47.26. The 3.2 `List` is
+fine.
 
 Not done yet:
 - booting from a partition, the boot menu and CD boot on the real card

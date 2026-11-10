@@ -14,10 +14,10 @@
  * disk" in partitioning tools), so empty higher IDs cost no time.
  *
  * Then a bootable CD in a CD-ROM drive is added as CD0, with the CD01 file
- * system, if one is registered by then: from Kickstart (a module such as
- * ODFileSystem's ROM build) or from a disk's RDB, loaded above. The ROM has
- * no room for one of its own. With one, the IDs after a "last disk" are
- * still probed, for CD-ROM drives only.
+ * system if one is registered by then: from Kickstart (a module such as
+ * ODFileSystem's ROM build) or from a disk's RDB, loaded above. Otherwise it
+ * gets the small ISO 9660 file system in cdfs.c. The IDs after a "last
+ * disk" are still probed, for CD-ROM drives only.
  */
 #include <devices/hardblocks.h>
 #include <resources/filesysres.h>
@@ -330,13 +330,15 @@ static int same(const UBYTE *a, const char *b, int n)
     return 1;
 }
 
+#include "cdfs.c"
+
 /* A CD that boots: ISO 9660 with "CDTV" or "AMIGA BOOT" as System ID, as on
    CDTV, CD32 and AmigaOS 3.2 CDs (the A4091 ROM boots the same ones). Other
    CDs are left to the system's own CD0. A drive still spinning up gets about
    10 s, an empty one none. buf is 2048 bytes. */
 static int boot_cd(struct MC *mc, struct MCUnit *u, UBYTE *buf)
 {
-    UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 16, 0, 0, 1, 0 };   /* the volume descriptor */
+    UBYTE cdb[10] = { 0x28, 0, 0, 0, 0, 16, 0, 0, 1, 0 };   /* the volume descriptors */
     ULONG actual = 0;
     int k;
     for (k = 0; k < 6 && read_capacity(mc, u); k++) {
@@ -344,10 +346,16 @@ static int boot_cd(struct MC *mc, struct MCUnit *u, UBYTE *buf)
             return 0;
         mc_delay(mc, 500000);
     }
-    if (u->shift != 11 || scsi(mc, u, cdb, 10, buf, 2048, 1, &actual, 0) || actual != 2048 ||
-        buf[0] != 1 || !same(buf + 1, "CD001", 5))
+    if (u->shift != 11)
         return 0;
-    return same(buf + 8, "CDTV ", 5) || same(buf + 8, "AMIGA BOOT ", 11);
+    for (; cdb[5] < 32; cdb[5]++) {             /* to the primary one */
+        if (scsi(mc, u, cdb, 10, buf, 2048, 1, &actual, 0) || actual != 2048 ||
+            buf[0] == 255 || !same(buf + 1, "CD001", 5))
+            return 0;
+        if (buf[0] == 1)
+            return same(buf + 8, "CDTV ", 5) || same(buf + 8, "AMIGA BOOT ", 11);
+    }
+    return 0;
 }
 
 /* CD0 (CD1...) for a bootable CD, with boot priority 2, above the usual 0 of
@@ -372,7 +380,14 @@ static void add_cd(struct MCUnit *u, struct FileSysEntry *f, char *name, struct 
     pp[4 + DE_BOOTPRI] = 2;
     pp[4 + DE_DOSTYPE] = DOSTYPE_CD01;
     if ((dn = (struct DeviceNode *)MakeDosNode(pp))) {
-        fill_fs(dn, f);
+        if (f)
+            fill_fs(dn, f);
+        else {
+            dn->dn_SegList = cdfs_seglist();
+            dn->dn_GlobalVec = -1;
+            dn->dn_StackSize = 4096;
+            dn->dn_Priority = 10;
+        }
         AddBootNode(2, 0, dn, cd);
     }
 }
@@ -466,8 +481,6 @@ static void mount_all(struct MC *mc, struct IOStdReq *ior)
         ULONG blk;
         if (t == OWN_ID)
             continue;
-        if (last && !(fsr && find_fs(fsr, DOSTYPE_CD01)))
-            break;
         if (!mc->units[t] && !(mc->absent & (1 << t))) {
             memset(&pr, 0, sizeof pr);
             pr.io_Offset = t;
@@ -497,21 +510,20 @@ static void mount_all(struct MC *mc, struct IOStdReq *ior)
             if (fsr)
                 load_filesystems(mc, u, fsr, fs, buf, buf + 128);
             add_partitions(mc, u, fsr, parts, buf, cd);
-            /* "Last disk" in the RDB: no need to look at the higher IDs,
-               which saves 250 ms each when they are empty, unless there
-               is a CD file system: then for CD-ROM drives only. */
+            /* "Last disk" in the RDB: no more disks at the higher IDs,
+               only CD-ROM drives are looked for there. */
             if (flags & (RDBFF_LAST | RDBFF_LASTTID))
                 last = 1;
         }
     }
-    if (fsr && (f = find_fs(fsr, DOSTYPE_CD01)))
-        for (t = 0; t < MAX_TARGET; t++) {
-            struct MCUnit *u = mc->units[t];
-            if (u && u->type == 0x05 && boot_cd(mc, u, (UBYTE *)buf)) {
-                add_cd(u, f, cdname, cd);
-                cdname[2]++;
-            }
+    f = fsr ? find_fs(fsr, DOSTYPE_CD01) : 0;
+    for (t = 0; t < MAX_TARGET; t++) {
+        struct MCUnit *u = mc->units[t];
+        if (u && u->type == 0x05 && boot_cd(mc, u, (UBYTE *)buf)) {
+            add_cd(u, f, cdname, cd);
+            cdname[2]++;
         }
+    }
     CloseLibrary(ExpansionBase);
     FreeMem(buf, 2048);
 }
