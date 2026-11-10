@@ -244,6 +244,14 @@ pin 14), so the card only ever reads the first 16 KB of the chip. The rest of a
 the patched image in all four quarters, which costs nothing and also suits a
 chip that ends up in a socket wired differently.
 
+This was also tested from code, on the real card. A test ROM held the
+interrupt ROM in the first 16 KB of a 27C512 and a known pattern in the other
+48 KB. Its boot menu had a button that read board `$8000`-`$BFFF` (ROM 16-24 KB
+if `A14` were connected) and `$C000`-`$EFFF` (ROM 24-30 KB, overlapping the
+chip's registers), and counted the pattern bytes and the bytes repeating the
+first 16 KB. The card read `00` there: neither the pattern nor a mirror of the
+first 16 KB. The ROM is limited to 16 KB. The test build is not kept.
+
 Jumpers: JP1 and JP2 next to the socket switch the memory and the card on and off.
 The unlabelled 3-pin jumper below the EPROM is for the LED and nothing else.
 
