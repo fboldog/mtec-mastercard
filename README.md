@@ -36,7 +36,7 @@ test history and the patched M-Tec ROM, is in [DETAILS.md](DETAILS.md).
   Tested in Amiberry with the boot partition at 2.5-3.5 GB.
 - **Start-up:** waits up to 10 s for a drive that is still spinning up, and
   skips empty SCSI IDs after a disk whose RDB has "last disk" set.
-- **CD boot:** installs AmigaOS 3.2 without floppies. A bootable CD (the
+- **CD boot:** [installs AmigaOS 3.2 without floppies](images/cdboot.png). A bootable CD (the
   AmigaOS 3.2, CDTV and CD32 kind) in a SCSI CD-ROM drive boots, with a small
   read-only ISO 9660 file system built into the ROM. It handles disc changes,
   so the boot CD can be taken out and put back. A CD file system in a disk's
@@ -46,8 +46,6 @@ test history and the patched M-Tec ROM, is in [DETAILS.md](DETAILS.md).
   The CD boot is based on the
   [A4091 software](https://github.com/A4091/a4091-software), and the small ISO
   9660 file system on [ODFileSystem](https://github.com/reinauer/ODFileSystem/).
-
-![Booted from the AmigaOS 3.2 CD, in Amiberry](images/cdboot.png)
 
 **The boot menu:** hold the right mouse button at power-on. It lists the
 devices with their partitions, and a CD drive with the disc's name. "Boot
