@@ -164,7 +164,12 @@ static int row(struct MC *mc, UWORD r, char cells[COLS][CELL], UBYTE end[COLS])
             end[1] = 1;
             cells[2][0] = boot || u->cdboot ? '*' : '-';
             end[2] = 1;
-            end[3] = ident(cells[3], u->ident) - cells[3];
+            if (u->label) {                 /* a CD: its volume ID */
+                for (i = 24; i && u->ident[i - 1] == ' '; i--)
+                    ;
+                end[3] = put(cells[3], u->ident, i) - cells[3];
+            } else
+                end[3] = ident(cells[3], u->ident) - cells[3];
             end[4] = put(cells[4], type_name(u->type), 7) - cells[4];
             if (u->shift && u->blocks)
                 end[6] = size(cells[6], u->blocks >> (20 - u->shift)) - cells[6];

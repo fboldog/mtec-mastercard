@@ -537,8 +537,9 @@ buttons stay Kickstart's own Early Startup menu. The driver first finds the
 devices and reads their RDBs, then shows a table like CSA's: each device (SCSI
 ID, vendor and product, type, size), followed by its partitions (drive name,
 file system type such as `DOS\3` or `PFS\3`, boot priority, size), with `*` or
-`-` in the Mount and Boot columns. Up to 16 partitions are listed; a CD-ROM drive with a bootable CD has `*`
-under Boot. **Boot**
+`-` in the Mount and Boot columns. Up to 16 partitions are listed; a CD-ROM drive shows the disc's volume ID
+(the drive's name with no disc or no ID), and `*` under Boot for a bootable
+CD. **Boot**
 (Return) continues; **Skip card this boot** (Esc) leaves the card's partitions
 unmounted for this boot only.
 
@@ -651,7 +652,9 @@ with FFS DH0 and a CD drive with the AmigaOS 3.2 CD at ID 2:
   `version sys:libs/workbench.library` work from it again;
 - with an empty drive and with a non-bootable CD (Amiga Developer CD 1.1,
   System ID `ANY SYSTEM`) DH0 boots and there is no CD0;
-- the boot menu lists the drive as `CD-ROM` with `*` under Boot.
+- the boot menu lists the drive as `CD-ROM` with `*` under Boot and the
+  disc's volume ID, `AmigaOS3.2CD`; the drive's name with an empty drive or a
+  blank volume ID.
 
 The `List` from the 3.0 install disk counts wrongly on Kickstart 3.2 with CD
 file systems that leave `ExAll` to DOS, and crashes with its output redirected

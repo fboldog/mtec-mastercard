@@ -348,12 +348,19 @@ static int boot_cd(struct MC *mc, struct MCUnit *u, UBYTE *buf)
     }
     if (u->shift != 11)
         return 0;
-    for (; cdb[5] < 32; cdb[5]++) {             /* to the primary one */
+    for (u->label = 0; cdb[5] < 32; cdb[5]++) {             /* to the primary one */
         if (scsi(mc, u, cdb, 10, buf, 2048, 1, &actual, 0) || actual != 2048 ||
             buf[0] == 255 || !same(buf + 1, "CD001", 5))
             return 0;
-        if (buf[0] == 1)
+        if (buf[0] == 1) {
+            /* The boot menu shows the disc's volume ID, if it has one. */
+            for (k = 0; k < 28; k++)
+                if (buf[40 + k] > ' ')
+                    u->label = 1;
+            for (k = 0; u->label && k < 28; k++)
+                u->ident[k] = buf[40 + k] > ' ' ? buf[40 + k] : ' ';
             return same(buf + 8, "CDTV ", 5) || same(buf + 8, "AMIGA BOOT ", 11);
+        }
     }
     return 0;
 }

@@ -152,6 +152,7 @@ struct MCUnit {
 #ifdef ROM_BUILD
     char ident[29];         /* vendor, product, revision from INQUIRY, for the boot menu */
     UBYTE cdboot;           /* a bootable CD was in the drive at the boot menu's scan */
+    UBYTE label;            /* ident holds the CD's volume ID instead */
 #endif
 };
 
