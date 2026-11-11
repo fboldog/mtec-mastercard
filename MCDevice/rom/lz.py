@@ -6,11 +6,19 @@ reads them: when it needs a bit and has none left, the next stream byte is a
 new group of 8, used from bit 7 down. Numbers are interlaced Elias gamma:
 v = 1, then while the next bit is 0, v = v * 2 + the bit after it.
 
-    0, gamma n               n literal bytes follow
-    1, gamma h, byte l       copy from offset (h - 1) * 256 + l + 1 back,
-       gamma n               n + 1 bytes
+Tokens, the first bit chosen by what came before (as in zx0):
 
-The decoder stops when the output is full; the size is in the ROM header.
+    after a copy, or at the start:
+        0, gamma n               n literal bytes follow
+        1, new copy
+    after literal bytes:
+        0, gamma n               copy n bytes from the last offset again
+        1, new copy
+    new copy: gamma h, byte l    offset (h - 1) * 256 + l + 1 back,
+              gamma n            n + 1 bytes
+
+The last offset starts at 1. The decoder stops when the output is full;
+the size is in the ROM header.
 """
 
 
@@ -46,69 +54,98 @@ class _Writer:
         self.out.append(b)
 
 
+def _matches(data, chain):
+    """Per position: (offset, longest length), nearest first, each only
+    where it is longer than every nearer one."""
+    n = len(data)
+    heads = {}
+    cands = [()] * n
+    for i in range(n - 1):
+        prev = heads.setdefault(data[i:i + 2], [])
+        lst = []
+        best = 1
+        for p in reversed(prev[-chain:]):
+            ln = 0
+            while i + ln < n and data[p + ln] == data[i + ln]:
+                ln += 1
+            if ln > best:
+                lst.append((i - p, ln))
+                best = ln
+        prev.append(i)
+        cands[i] = lst
+    return cands
+
+
 def compress(data, max_lit=255, chain=512):
+    """Forward parse over two states (after a copy, after literals), each
+    position keeping the cheapest way in and the last offset that brings."""
     data = bytes(data)
     n = len(data)
-    # Match candidates per position: (offset, longest length), nearest first,
-    # each one only where it is longer than every nearer one.
-    heads = {}
-    cands = [None] * n
-    for i in range(n):
-        lst = []
-        if i + 1 < n:
-            key = data[i:i + 2]
-            prev = heads.get(key, [])
-            best = 1
-            for p in reversed(prev[-chain:]):
-                ln = 0
-                while i + ln < n and data[p + ln] == data[i + ln]:
-                    ln += 1
-                if ln > best:
-                    lst.append((i - p, ln))
-                    best = ln
-            prev.append(i)
-            heads[key] = prev
-        cands[i] = lst
-    # Cheapest encoding of data[i:], back to front.
+    cands = _matches(data, chain)
     INF = 1 << 60
-    cost = [INF] * (n + 1)
-    step = [None] * (n + 1)
-    cost[n] = 0
-    for i in range(n - 1, -1, -1):
-        best, how = INF, None
-        for k in range(1, min(max_lit, n - i) + 1):
-            c = 1 + gamma_bits(k) + 8 * k + cost[i + k]
-            if c < best:
-                best, how = c, ("L", k)
-        lo = 2
-        for off, ln in cands[i]:
-            o = off - 1
-            oc = 1 + gamma_bits((o >> 8) + 1) + 8
-            lens = range(lo, ln + 1) if ln - lo < 64 else list(range(lo, lo + 64)) + [ln]
-            for m in lens:
-                c = oc + gamma_bits(m - 1) + cost[i + m]
-                if c < best:
-                    best, how = c, ("M", off, m)
-            lo = ln + 1
-        cost[i], step[i] = best, how
+    COPY, LIT = 0, 1
+    cost = [[INF] * (n + 1), [INF] * (n + 1)]
+    last = [[1] * (n + 1), [1] * (n + 1)]
+    step = [[None] * (n + 1), [None] * (n + 1)]
+    cost[COPY][0] = 0
+
+    def relax(i, s, c, j, t, how, off):
+        if c < cost[t][j]:
+            cost[t][j] = c
+            last[t][j] = off
+            step[t][j] = (i, s, how)
+
+    for i in range(n):
+        for s in (COPY, LIT):
+            c0 = cost[s][i]
+            if c0 >= INF:
+                continue
+            lo = last[s][i]
+            if s == COPY:
+                for k in range(1, min(max_lit, n - i) + 1):
+                    relax(i, s, c0 + 1 + gamma_bits(k) + 8 * k, i + k, LIT, ("L", k), lo)
+            elif i >= lo:
+                m = 0
+                while i + m < n and data[i - lo + m] == data[i + m]:
+                    m += 1
+                for k in range(1, m + 1):
+                    relax(i, s, c0 + 1 + gamma_bits(k), i + k, COPY, ("R", k), lo)
+            nxt = 2
+            for off, ln in cands[i]:
+                oc = c0 + 1 + gamma_bits(((off - 1) >> 8) + 1) + 8
+                lens = range(nxt, ln + 1) if ln - nxt < 64 else list(range(nxt, nxt + 64)) + [ln]
+                for k in lens:
+                    relax(i, s, oc + gamma_bits(k - 1), i + k, COPY, ("M", off, k), off)
+                nxt = ln + 1
+    # back from the cheaper end state
+    s = COPY if cost[COPY][n] <= cost[LIT][n] else LIT
+    steps, j = [], n
+    while j:
+        i, ps, how = step[s][j]
+        steps.append(how)
+        j, s = i, ps
+    steps.reverse()
     w = _Writer()
     i = 0
-    while i < n:
-        s = step[i]
-        if s[0] == "L":
+    for how in steps:
+        if how[0] == "L":
             w.bit(0)
-            w.gamma(s[1])
-            for b in data[i:i + s[1]]:
+            w.gamma(how[1])
+            for b in data[i:i + how[1]]:
                 w.byte(b)
-            i += s[1]
+            i += how[1]
+        elif how[0] == "R":
+            w.bit(0)
+            w.gamma(how[1])
+            i += how[1]
         else:
-            _, off, m = s
+            _, off, k = how
             o = off - 1
             w.bit(1)
             w.gamma((o >> 8) + 1)
             w.byte(o & 0xFF)
-            w.gamma(m - 1)
-            i += m
+            w.gamma(k - 1)
+            i += k
     return bytes(w.out)
 
 
@@ -133,17 +170,25 @@ def decompress(src, size):
             v = v * 2 + getbit()
         return v
 
+    def copy(off, k):
+        p = len(out) - off
+        for _ in range(k):
+            out.append(out[p])
+            p += 1
+
+    last = 1
     while len(out) < size:
         if not getbit():
-            k = gamma()
+            k = gamma()                         # literals
             out += src[pos:pos + k]
             pos += k
-        else:
-            h = gamma()
-            o = (h - 1) << 8 | src[pos]
-            pos += 1
-            p = len(out) - o - 1
-            for _ in range(gamma() + 1):
-                out.append(out[p])
-                p += 1
+            if len(out) >= size:
+                break
+            if not getbit():
+                copy(last, gamma())             # the last offset again
+                continue
+        h = gamma()                             # a new copy
+        last = ((h - 1) << 8 | src[pos]) + 1
+        pos += 1
+        copy(last, gamma() + 1)
     return bytes(out)

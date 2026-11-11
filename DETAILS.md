@@ -539,7 +539,11 @@ ID, vendor and product, type, size), followed by its partitions (drive name,
 file system type such as `DOS\3` or `PFS\3`, boot priority, size), with `*` or
 `-` in the Mount and Boot columns. Up to 16 partitions are listed; a CD-ROM drive shows the disc's volume ID
 (the drive's name with no disc or no ID), and `*` under Boot for a bootable
-CD. **Boot**
+CD. Below the table, the version and mode (`v0.1, interrupt mode`). With more
+than one thing to boot from, **Boot from** lists the bootable partitions and
+the bootable CDs (`CD0` and the volume ID), starting at the one that would boot
+anyway; the one chosen gets boot priority 127 for this boot, so it boots
+before anything else, also on other controllers. It is mouse only. **Boot**
 (Return) continues; **Skip card this boot** (Esc) leaves the card's partitions
 unmounted for this boot only.
 
@@ -562,15 +566,18 @@ builds it with the local toolchain. The disk drivers keep everything and the
 local toolchain.
 
 **Compression:** the driver and its relocation table are stored compressed, in
-a small LZ format of our own (`rom/lz.py`): literal runs and copies, lengths
-and offsets as interlaced Elias gamma codes, bit groups interleaved with the
-bytes. `pack.py` compresses with an optimal parse and checks that the result
-unpacks. The decoder in `diag.s` is about 70 bytes and reads the byte-wide ROM
-directly, so it needs no buffer; the relocation table is unpacked into what
-becomes the bss and cleared as it is applied. The driver moved from `$0200` to
-`$0300` to give the DiagArea room (290 of 352 bytes). With GCC 16.2 the
-interrupt ROM packs 16314 bytes into 11501 and leaves 4115 bytes free; the
-polled one 4275. Before compression the interrupt ROM had 254 bytes free.
+a small LZ format of our own (`rom/lz.py`): literal runs, copies, and as in
+zx0 a copy from the last offset again right after literals; lengths and
+offsets as interlaced Elias gamma codes, bit groups interleaved with the bytes.
+`pack.py` compresses with an optimal parse over the two states (after a copy,
+after literals) and checks that the result unpacks. The decoder in `diag.s` is
+about 90 bytes and reads the byte-wide ROM directly, so it needs no buffer; the
+relocation table is unpacked into what becomes the bss and cleared as it is
+applied. The driver moved from `$0200` to `$0300` to give the DiagArea room
+(306 of 352 bytes). The copy from the last offset saved about 590 bytes. With
+GCC 16.2 the interrupt ROM now packs 22256 bytes into 15080 and leaves 536
+bytes free; the polled one 678. Before compression the interrupt ROM had 254
+bytes free.
 
 ### CD boot
 
@@ -625,8 +632,8 @@ caller's buffer, directories and the ends of reads through one cached sector.
   (BSD-2-Clause, Copyright (c) 2026 Stefan Reinauer); a path's `vol:` or
   `assign:` is skipped and the lock DOS passes kept, as ODFileSystem does.
 
-With it the interrupt ROM packs 21450 bytes into 15058 and has 558 bytes free
-(polled 716).
+With it the interrupt ROM packed 21450 bytes into 15058 and had 558 bytes free
+(polled 716), before the boot menu's "Boot from" and the better compression.
 
 Tested in Amiberry, Kickstart 3.2 (47.115), the interrupt ROM, a disk at ID 1
 with FFS DH0 and a CD drive with the AmigaOS 3.2 CD at ID 2:
@@ -652,6 +659,9 @@ with FFS DH0 and a CD drive with the AmigaOS 3.2 CD at ID 2:
   `version sys:libs/workbench.library` work from it again;
 - with an empty drive and with a non-bootable CD (Amiga Developer CD 1.1,
   System ID `ANY SYSTEM`) DH0 boots and there is no CD0;
+- **Boot from**, with DH0 bootable at priority 1 and the 3.2 CD: the default,
+  the CD, boots the CD; DH0 chosen boots DH0. With DH0 at priority 5, the
+  default DH0, the CD chosen boots the CD;
 - the boot menu lists the drive as `CD-ROM` with `*` under Boot and the
   disc's volume ID, `AmigaOS3.2CD`; the drive's name with an empty drive or a
   blank volume ID.
@@ -661,8 +671,11 @@ file systems that leave `ExAll` to DOS, and crashes with its output redirected
 (`#8700000E`); it does the same with `CDFileSystem` 47.26. The 3.2 `List` is
 fine.
 
+On the real card, the AmigaOS 3.2 CD image on a BlueSCSI boots, and quickly
+(reported by the owner; no log).
+
 Not done yet:
-- booting from a partition, the boot menu and CD boot on the real card
+- booting from a partition and the boot menu on the real card
 - disks with other block sizes and LUNs above 0 at boot
 - disconnection
 - detecting medium changes without a command

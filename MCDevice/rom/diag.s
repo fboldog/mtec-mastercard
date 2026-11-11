@@ -11,7 +11,8 @@
 | The blob, written by pack.py, is byte-wide on even board addresses, so
 | movep.l reads one long of its header from 8 board bytes:
 |   0 memory size (code + data + bss)   4 unpacked bytes   8 relocations
-|  12 RomTag offset                    16 packed data (rom/lz.py's format)
+|  12 RomTag offset                    16 packed data (rom/lz.py's format,
+|                                         which says what the bits mean)
 | Unpacked, it is the image, then the relocation offsets, one word each: the
 | driver is far below 64 KB. The table ends up in what becomes the bss, so it
 | is cleared as it is used.
@@ -73,28 +74,36 @@ DiagPoint:
 	movea.l	d0,a1
 	lea	0(a5,d6.l),a2		| end of the unpacked data
 	moveq	#-128,d7		| no bits left
-1:	cmpa.l	a2,a1			| unpack
+	moveq	#1,d3			| the last offset
+1:	cmpa.l	a2,a1			| unpack: after a copy
 	bcc.s	5f
 	bsr.s	getbit
-	bcs.s	3f
+	bcs.s	3f			| 1: a new copy
 	bsr.s	gamma			| 0: literal bytes
 2:	move.b	(a4),(a1)+
 	addq.l	#2,a4
 	subq.l	#1,d0
 	bne.s	2b
-	bra.s	1b
-3:	bsr.s	gamma			| 1: a copy, offset high byte + 1
+	cmpa.l	a2,a1			| after literals
+	bcc.s	5f
+	bsr.s	getbit
+	bcs.s	3f			| 1: a new copy
+	bsr.s	gamma			| 0: the last offset again, n bytes
+	subq.l	#1,d0
+	bra.s	4f
+3:	bsr.s	gamma			| offset high byte + 1
 	subq.l	#1,d0
 	lsl.l	#8,d0
 	move.b	(a4),d0
 	addq.l	#2,a4
-	movea.l	a1,a3
-	suba.l	d0,a3
-	subq.l	#1,a3
+	addq.l	#1,d0
+	move.l	d0,d3
 	bsr.s	gamma			| length - 1
-4:	move.b	(a3)+,(a1)+
+4:	movea.l	a1,a3			| copy d0 + 1 bytes
+	suba.l	d3,a3
+6:	move.b	(a3)+,(a1)+
 	subq.l	#1,d0
-	bcc.s	4b
+	bcc.s	6b
 	bra.s	1b
 5:	move.l	a5,d2			| relocate
 	movea.l	a2,a0

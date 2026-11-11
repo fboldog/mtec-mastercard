@@ -41,6 +41,9 @@ void *memset(void *d, int c, unsigned long n);
 
 #define GID_BOOT 1
 #define GID_SKIP 2
+#define GID_FROM 3
+#define NCHOICE (MC_MAX_PARTS + 2)          /* bootable partitions and two CDs */
+#define CD_K    0xFF                        /* "partition" number of a CD */
 
 #define ROWS   7                        /* SCSI IDs 0-6 */
 #define COLS   7
@@ -57,7 +60,7 @@ void *memset(void *d, int c, unsigned long n);
 
 static const char title[] = "M-Tec MasterCard SCSI";
 static const char wtitle[] = "MasterCard SCSI boot options";
-static const char info[] = "mastercard.device 0.1, " MODE_TEXT ", asynchronous SCSI";
+static const char info[] = "v0.1, " MODE_TEXT;
 static const char none[] = "No SCSI devices answered.";
 
 /* Column widths in characters, and which are right-aligned. */
@@ -108,6 +111,15 @@ static char *size(char *d, ULONG mb)
     if (mb >= 10000)
         return put(num(d, mb >> 10), " GB", 3);
     return put(num(d, mb), " MB", 3);
+}
+
+/* A CD's volume ID, without trailing spaces. */
+static char *cdlabel(char *d, struct MCUnit *u)
+{
+    int n = 24;
+    while (n && u->ident[n - 1] == ' ')
+        n--;
+    return put(d, u->ident, n);
 }
 
 /* Vendor and product from INQUIRY, single-spaced. */
@@ -164,12 +176,7 @@ static int row(struct MC *mc, UWORD r, char cells[COLS][CELL], UBYTE end[COLS])
             end[1] = 1;
             cells[2][0] = boot || u->cdboot ? '*' : '-';
             end[2] = 1;
-            if (u->label) {                 /* a CD: its volume ID */
-                for (i = 24; i && u->ident[i - 1] == ' '; i--)
-                    ;
-                end[3] = put(cells[3], u->ident, i) - cells[3];
-            } else
-                end[3] = ident(cells[3], u->ident) - cells[3];
+            end[3] = (u->label ? cdlabel(cells[3], u) : ident(cells[3], u->ident)) - cells[3];
             end[4] = put(cells[4], type_name(u->type), 7) - cells[4];
             if (u->shift && u->blocks)
                 end[6] = size(cells[6], u->blocks >> (20 - u->shift)) - cells[6];
@@ -230,6 +237,12 @@ int bootui_show(struct MC *mc)
     int done = 0, skip = 0;
     WORD fh, top, h, y, x, cw, bw, ww, boxh, padt, chw, rowh;
     UWORD k, c, rows = 0, maxrows;
+    STRPTR labels[NCHOICE + 1];
+    UBYTE ct[NCHOICE], ck[NCHOICE];         /* each choice: target, partition */
+    char cdl[2][32];
+    struct Gadget *from = 0;
+    LONG best = -129;
+    UWORD nc = 0, act = 0, ncd = 0;
 
     IntuitionBase = (struct IntuitionBase *)OpenLibrary((STRPTR)"intuition.library", 39);
     GfxBase = (struct GfxBase *)OpenLibrary((STRPTR)"graphics.library", 39);
@@ -281,6 +294,36 @@ int bootui_show(struct MC *mc)
         ww = scr->Width;
     h = top + 6 + boxh + 8 + fh + 10 + (fh + 6) + 6 + scr->WBorBottom;
 
+    /* What can boot, for "Boot from": the bootable partitions, then the
+       bootable CDs, named as mounting will name them. The one that would
+       boot anyway comes up first. */
+    for (k = 0; k < mc->nparts; k++) {
+        struct MCPart *p = &mc->parts[k];
+        if ((p->flags & (PBFF_BOOTABLE | PBFF_NOMOUNT)) == PBFF_BOOTABLE) {
+            if (p->bootpri > best)
+                best = p->bootpri, act = nc;
+            ct[nc] = p->target;
+            ck[nc] = p->index;
+            labels[nc++] = (STRPTR)p->name;
+        }
+    }
+    for (k = 0; k < ROWS && ncd < 2; k++) {
+        struct MCUnit *u = mc->units[k];
+        if (u && u->cdboot) {
+            char *d = put(cdl[ncd], "CD0  ", 5);
+            d[-3] += ncd++;
+            *(u->label ? cdlabel(d, u) : d) = 0;
+            if (2 > best)
+                best = 2, act = nc;
+            ct[nc] = k;
+            ck[nc] = CD_K;
+            labels[nc++] = (STRPTR)cdl[ncd - 1];
+        }
+    }
+    labels[nc] = 0;
+    if (nc > 1)
+        h += fh + 6 + 6;
+
     if (!(g = (struct Gadget *)CreateContext(&glist)))
         goto out;
     memset(&ng, 0, sizeof ng);
@@ -299,6 +342,19 @@ int bootui_show(struct MC *mc)
         ng.ng_GadgetText = (STRPTR)"_Skip card this boot";
         ng.ng_GadgetID = GID_SKIP;
         g = (struct Gadget *)CreateGadgetA(BUTTON_KIND, g, &ng, gt);
+    }
+    if (g && nc > 1) {
+        struct TagItem ct[] = {
+            { GTCY_Labels, (ULONG)labels }, { GTCY_Active, act }, { TAG_DONE, 0 }
+        };
+        WORD lw = TextLength(&scr->RastPort, (STRPTR)"Boot from", 9) + 8;
+        ng.ng_LeftEdge = scr->WBorLeft + MARGIN + lw;
+        ng.ng_TopEdge -= fh + 6 + 6;
+        ng.ng_Width = cw - lw;
+        ng.ng_GadgetText = (STRPTR)"Boot from";
+        ng.ng_GadgetID = GID_FROM;
+        ng.ng_Flags = PLACETEXT_LEFT;
+        g = from = (struct Gadget *)CreateGadgetA(CYCLE_KIND, g, &ng, ct);
     }
     if (!g)
         goto out;
@@ -372,7 +428,9 @@ int bootui_show(struct MC *mc)
             UWORD code = m->Code;
             struct Gadget *mg = (struct Gadget *)m->IAddress;
             GT_ReplyIMsg(m);
-            if (cls == IDCMP_GADGETUP) {
+            if (cls == IDCMP_GADGETUP && mg->GadgetID == GID_FROM) {
+                act = code;
+            } else if (cls == IDCMP_GADGETUP) {
                 done = 1;
                 skip = mg->GadgetID == GID_SKIP;
             } else if (cls == IDCMP_VANILLAKEY) {
@@ -386,6 +444,11 @@ int bootui_show(struct MC *mc)
                 GT_EndRefresh(win, TRUE);
             }
         }
+    }
+    /* The choice boots: mounting gives it the highest boot priority. */
+    if (from && !skip) {
+        mc->sel_t = ct[act] + 1;
+        mc->sel_k = ck[act];
     }
 out:
     if (win)

@@ -173,7 +173,7 @@ struct MCPart {
     UBYTE target;
     UBYTE flags;            /* PBFF_BOOTABLE, PBFF_NOMOUNT */
     BYTE bootpri;
-    UBYTE pad;
+    UBYTE index;            /* its place in the RDB's partition list */
     ULONG dostype;
     ULONG mb;
     char name[12];
@@ -203,6 +203,8 @@ struct MC {
 #ifdef ROM_BUILD
     UBYTE absent;               /* targets the boot menu's scan found empty */
     UBYTE nparts;
+    UBYTE sel_t, sel_k;         /* the boot menu's "Boot from": target + 1 (0 none), its
+                                   partition in the RDB, or 0xFF for the CD */
     struct MCPart parts[MC_MAX_PARTS];  /* what the boot menu's scan found in the RDBs */
 #endif
 };

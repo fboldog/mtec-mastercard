@@ -316,6 +316,8 @@ static void add_partitions(struct MC *mc, struct MCUnit *u, struct FileSysResour
         if (fsr)
             fill_fs(dn, find_fs(fsr, de->de_DosType));
         pri = (pb->pb_Flags & PBFF_BOOTABLE) && n > DE_BOOTPRI ? (LONG)pb->pb_Environment[DE_BOOTPRI] : -128;
+        if (mc->sel_t == u->target + 1 && mc->sel_k == guard - 1)
+            pri = 127;                      /* chosen in the boot menu */
         AddBootNode(pri, 0, dn, cd);
     }
 }
@@ -367,25 +369,21 @@ static int boot_cd(struct MC *mc, struct MCUnit *u, UBYTE *buf)
 
 /* CD0 (CD1...) for a bootable CD, with boot priority 2, above the usual 0 of
    disk partitions; Kickstart's Early Startup menu can still pick another. */
-static void add_cd(struct MCUnit *u, struct FileSysEntry *f, char *name, struct ConfigDev *cd)
+static void add_cd(struct MCUnit *u, struct FileSysEntry *f, char *name, struct ConfigDev *cd, LONG pri)
 {
+    /* DE_TABLESIZE .. DE_DOSTYPE: 2048-byte blocks, 20 buffers */
+    static const ULONG env[DE_DOSTYPE + 1] = {
+        DE_DOSTYPE, 2048 / 4, 0, 1, 1, 1, 0, 0, 0, 0, 0, 20, MEMF_PUBLIC,
+        0x7FFFFFFFUL, 0xFFFFFFFEUL, 0, DOSTYPE_CD01
+    };
     ULONG pp[4 + DE_DOSTYPE + 1];
     struct DeviceNode *dn;
-    memset(pp, 0, sizeof pp);
     pp[0] = (ULONG)name;
     pp[1] = (ULONG)dev_name;
     pp[2] = u->target + 10 * u->lun;
-    pp[4 + DE_TABLESIZE] = DE_DOSTYPE;
-    pp[4 + DE_SIZEBLOCK] = 2048 / 4;
-    pp[4 + DE_NUMHEADS] = 1;
-    pp[4 + DE_SECSPERBLK] = 1;
-    pp[4 + DE_BLKSPERTRACK] = 1;
-    pp[4 + DE_NUMBUFFERS] = 20;
-    pp[4 + DE_BUFMEMTYPE] = MEMF_PUBLIC;
-    pp[4 + DE_MAXTRANSFER] = 0x7FFFFFFFUL;
-    pp[4 + DE_MASK] = 0xFFFFFFFEUL;
-    pp[4 + DE_BOOTPRI] = 2;
-    pp[4 + DE_DOSTYPE] = DOSTYPE_CD01;
+    pp[3] = 0;
+    memcpy(pp + 4, env, sizeof env);
+    pp[4 + DE_BOOTPRI] = pri;
     if ((dn = (struct DeviceNode *)MakeDosNode(pp))) {
         if (f)
             fill_fs(dn, f);
@@ -395,7 +393,7 @@ static void add_cd(struct MCUnit *u, struct FileSysEntry *f, char *name, struct 
             dn->dn_StackSize = 4096;
             dn->dn_Priority = 10;
         }
-        AddBootNode(2, 0, dn, cd);
+        AddBootNode(pri, 0, dn, cd);
     }
 }
 
@@ -420,6 +418,7 @@ static void scan_parts(struct MC *mc, struct MCUnit *u, ULONG *buf)
             return;
         blk = pb->pb_Next;
         p->target = u->target;
+        p->index = guard - 1;
         p->flags = pb->pb_Flags;
         p->bootpri = de->de_TableSize >= DE_BOOTPRI ? (BYTE)de->de_BootPri : 0;
         p->dostype = de->de_TableSize >= DE_DOSTYPE ? de->de_DosType : 0x444F5300;
@@ -527,7 +526,7 @@ static void mount_all(struct MC *mc, struct IOStdReq *ior)
     for (t = 0; t < MAX_TARGET; t++) {
         struct MCUnit *u = mc->units[t];
         if (u && u->type == 0x05 && boot_cd(mc, u, (UBYTE *)buf)) {
-            add_cd(u, f, cdname, cd);
+            add_cd(u, f, cdname, cd, mc->sel_t == t + 1 && mc->sel_k == 0xFF ? 127 : 2);
             cdname[2]++;
         }
     }

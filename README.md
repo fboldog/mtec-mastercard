@@ -36,17 +36,23 @@ test history and the patched M-Tec ROM, is in [DETAILS.md](DETAILS.md).
   Tested in Amiberry with the boot partition at 2.5-3.5 GB.
 - **Start-up:** waits up to 10 s for a drive that is still spinning up, and
   skips empty SCSI IDs after a disk whose RDB has "last disk" set.
-- **CD boot:** boots a bootable CD, such as the AmigaOS 3.2 CD, from a SCSI
-  CD-ROM drive. A small read-only ISO 9660 file system is built into the ROM;
-  a CD file system in a disk's RDB or in Kickstart is used instead when there
-  is one. The ROM's contents are compressed to make room. Tested in Amiberry;
-  see [DETAILS.md](DETAILS.md#cd-boot).
+- **CD boot:** installs AmigaOS 3.2 without floppies. A bootable CD (the
+  AmigaOS 3.2, CDTV and CD32 kind) in a SCSI CD-ROM drive boots, with a small
+  read-only ISO 9660 file system built into the ROM. It handles disc changes,
+  so the boot CD can be taken out and put back. A CD file system in a disk's
+  RDB or in Kickstart is used instead when there is one. The ROM's contents
+  are compressed to make room. The 3.2 CD boots on the real card from a
+  BlueSCSI's CD image; see [DETAILS.md](DETAILS.md#cd-boot).
+
+![Booted from the AmigaOS 3.2 CD, in Amiberry](images/cdboot.png)
 
 **The boot menu:** hold the right mouse button at power-on. It lists the
-devices and their partitions, and can skip the card's partitions for one boot.
-Both buttons together still open Kickstart's own Early Startup menu.
+devices with their partitions, and a CD drive with the disc's name. "Boot
+from" chooses which partition or CD boots, and "Skip card this boot" leaves
+the card's partitions out for one boot. Both buttons together still open
+Kickstart's own Early Startup menu.
 
-![The boot menu, in Amiberry](images/bootmenu.png)
+![The boot menu, in Amiberry: a disk and the AmigaOS 3.2 CD](images/bootmenu.png)
 
 ## Fixed bugs
 
