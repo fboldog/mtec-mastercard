@@ -7,8 +7,9 @@
  * the packets DOS, the Shell and Workbench use to boot and read from it.
  * Discs can be changed; a lock or file of a disc taken out waits for it to
  * come back. There is no Rock Ridge, Joliet or audio, and nothing can be
- * written. Some of the ISO record handling follows ODFileSystem's
- * backends/iso9660 (Copyright (c) 2026 Stefan Reinauer, BSD-2-Clause).
+ * written. Based on ODFileSystem (https://github.com/reinauer/ODFileSystem,
+ * Copyright (c) 2026 Stefan Reinauer, BSD-2-Clause), cut down to plain
+ * ISO 9660 for booting; its ISO record handling follows backends/iso9660.
  *
  * It runs as the handler process DOS starts for CD0, from a seglist that
  * jumps into the driver, and reads through mastercard.device with DoIO:

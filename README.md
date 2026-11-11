@@ -43,6 +43,9 @@ test history and the patched M-Tec ROM, is in [DETAILS.md](DETAILS.md).
   RDB or in Kickstart is used instead when there is one. The ROM's contents
   are compressed to make room. The 3.2 CD boots on the real card from a
   BlueSCSI's CD image; see [DETAILS.md](DETAILS.md#cd-boot).
+  The CD boot is based on the
+  [A4091 software](https://github.com/A4091/a4091-software), and the small ISO
+  9660 file system on [ODFileSystem](https://github.com/reinauer/ODFileSystem/).
 
 ![Booted from the AmigaOS 3.2 CD, in Amiberry](images/cdboot.png)
 
@@ -115,3 +118,15 @@ cd MCDevice && ./build.sh
 Copyrighted files are not in the repo and must not be added: M-Tec's disks and
 ROM, FFS, MUI, OS libraries, reference manuals and every `.adf`. See
 `.gitignore`.
+
+## Credits
+
+- **CD boot:** based on the [A4091 software](https://github.com/A4091/a4091-software):
+  which CDs boot (a `CDTV` or `AMIGA BOOT` System ID), and taking the CD file
+  system from Kickstart or a disk's RDB.
+- **The built-in ISO 9660 file system** (`MCDevice/cdfs.c`): based on
+  [ODFileSystem](https://github.com/reinauer/ODFileSystem/) by Stefan Reinauer
+  (BSD-2-Clause), cut down to plain ISO 9660 for booting.
+- **ROM compression:** ZX0 by Einar Saukas, compressed with salvador by Emmanuel
+  Marty, and decoded with salvador's 68000 decoder (zlib licence), in
+  `external/salvador`.
