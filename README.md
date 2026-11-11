@@ -96,10 +96,13 @@ The measurements and the tuning behind them are in
 ## Building and using
 
 You need the Bebbo `m68k-amigaos-gcc` in `/opt/amiga/bin`, the Amiga NDK 3.2,
-Python 3, and Docker for the ROM, which is built with GCC 16.2 from the
-`stefanreinauer/amiga-gcc:gcc-v16.2` image.
+Python 3, a host C compiler, and Docker for the ROM, which is built with GCC
+16.2 from the `stefanreinauer/amiga-gcc:gcc-v16.2` image. The ROM is compressed
+with salvador (ZX0, by Emmanuel Marty; [reinauer/salvador](https://github.com/reinauer/salvador)), a submodule
+that `build.sh` builds.
 
 ```sh
+git submodule update --init
 cd MCDevice && ./build.sh
 ```
 

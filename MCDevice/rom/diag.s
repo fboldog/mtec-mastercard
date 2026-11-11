@@ -11,8 +11,7 @@
 | The blob, written by pack.py, is byte-wide on even board addresses, so
 | movep.l reads one long of its header from 8 board bytes:
 |   0 memory size (code + data + bss)   4 unpacked bytes   8 relocations
-|  12 RomTag offset                    16 packed data (rom/lz.py's format,
-|                                         which says what the bits mean)
+|  12 RomTag offset                    16 packed data (ZX0, by salvador)
 | Unpacked, it is the image, then the relocation offsets, one word each: the
 | driver is far below 64 KB. The table ends up in what becomes the bss, so it
 | is cleared as it is used.
@@ -38,24 +37,44 @@ BootPoint:
 	jsr	(a0)
 1:	rts
 
-| The next bit of the packed data, in the carry and X: bit groups of 8, used
-| from bit 7 down, with a marker bit shifted in behind them.
-getbit:
+| The ZX0 (V2) decoder: salvador's asm/68000/unzx0_68000.S by Emmanuel Marty,
+| ZX0 by Einar Saukas, under the zlib licence below. Altered for the boot ROM:
+| it reads the byte-wide ROM, one board byte in two, through a4, keeps its
+| state in d3 (the negative last offset) and d7 (the bit queue), copies
+| through a3, and is split around DiagPoint so its branches stay short.
+|
+|  Copyright (C) 2021 Emmanuel Marty
+|  ZX0 compression (c) 2021 Einar Saukas, https://github.com/einar-saukas/ZX0
+|
+|  This software is provided 'as-is', without any express or implied
+|  warranty.  In no event will the authors be held liable for any damages
+|  arising from the use of this software.
+|
+|  Permission is granted to anyone to use this software for any purpose,
+|  including commercial applications, and to alter it and redistribute it
+|  freely, subject to the following restrictions:
+|
+|  1. The origin of this software must not be misrepresented; you must not
+|     claim that you wrote the original software. If you use this software
+|     in a product, an acknowledgment in the product documentation would be
+|     appreciated but is not required.
+|  2. Altered source versions must be plainly marked as such, and must not be
+|     misrepresented as being the original software.
+|  3. This notice may not be removed or altered from any source distribution.
+
+get_elias:
+	moveq	#1,d0			| an interlaced Elias gamma number
+elias_loop:
 	add.b	d7,d7
 	bne.s	1f
-	move.b	(a4),d7
+	move.b	(a4),d7			| 8 new bits
 	addq.l	#2,a4
 	addx.b	d7,d7
-1:	rts
-
-| An interlaced Elias gamma number, in d0.
-gamma:
-	moveq	#1,d0
-1:	bsr.s	getbit
-	bcs.s	2f
-	bsr.s	getbit
+1:	bcs.s	2f			| the stop bit
+elias_bt:
+	add.b	d7,d7
 	addx.l	d0,d0
-	bra.s	1b
+	bra.s	elias_loop
 2:	rts
 
 DiagPoint:
@@ -73,38 +92,36 @@ DiagPoint:
 	movea.l	d0,a5
 	movea.l	d0,a1
 	lea	0(a5,d6.l),a2		| end of the unpacked data
-	moveq	#-128,d7		| no bits left
-	moveq	#1,d3			| the last offset
-1:	cmpa.l	a2,a1			| unpack: after a copy
-	bcc.s	5f
-	bsr.s	getbit
-	bcs.s	3f			| 1: a new copy
-	bsr.s	gamma			| 0: literal bytes
+	moveq	#-128,d7		| no bits yet
+	moveq	#-1,d3			| the last offset: 1
+1:	bsr.s	get_elias		| literal bytes
+	subq.l	#1,d0
 2:	move.b	(a4),(a1)+
 	addq.l	#2,a4
-	subq.l	#1,d0
-	bne.s	2b
-	cmpa.l	a2,a1			| after literals
-	bcc.s	5f
-	bsr.s	getbit
-	bcs.s	3f			| 1: a new copy
-	bsr.s	gamma			| 0: the last offset again, n bytes
-	subq.l	#1,d0
-	bra.s	4f
-3:	bsr.s	gamma			| offset high byte + 1
-	subq.l	#1,d0
-	lsl.l	#8,d0
-	move.b	(a4),d0
+	dbf	d0,2b
+	add.b	d7,d7			| then a copy from the last offset or a new one
+	bcs.s	3f
+	bsr.s	get_elias		| the last offset again, n bytes
+4:	subq.l	#1,d0
+6:	movea.l	a1,a3
+	adda.l	d3,a3
+7:	move.b	(a3)+,(a1)+
+	dbf	d0,7b
+	add.b	d7,d7			| then literals or a new copy
+	bcc.s	1b
+3:	moveq	#-2,d0			| a new offset: its high byte
+	bsr.s	elias_loop
+	addq.b	#1,d0
+	beq.s	5f			| the end
+	move.w	d0,d3
+	lsl.w	#8,d3
+	moveq	#1,d0
+	move.b	(a4),d3			| its low byte, and a length bit
 	addq.l	#2,a4
-	addq.l	#1,d0
-	move.l	d0,d3
-	bsr.s	gamma			| length - 1
-4:	movea.l	a1,a3			| copy d0 + 1 bytes
-	suba.l	d3,a3
-6:	move.b	(a3)+,(a1)+
-	subq.l	#1,d0
-	bcc.s	6b
-	bra.s	1b
+	asr.l	#1,d3
+	bcs.s	6b			| length 2
+	bsr.s	elias_bt		| the rest of the length
+	bra.s	6b
 5:	move.l	a5,d2			| relocate
 	movea.l	a2,a0
 	suba.l	d5,a0

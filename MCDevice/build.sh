@@ -82,6 +82,11 @@ ls -l mastercard.device mastercard-irq.device mastercard-sync-irq.device masterc
 # rom/MCROM[-irq]-27C512.bin for the EPROM. Only our own code is in them.
 # The DiagArea (boot code) with the same toolchain; BLOBX = 2 * pack.py's BLOB.
 romas -m68020 --defsym BLOBX=1536 -o rom/diag.o rom/diag.s || exit 1
+# The ROM's compressor, salvador (ZX0), from the submodule; built here.
+if [ ! -x gen/salvador ] || [ -n "$(find ../external/salvador/src -newer gen/salvador -name '*.c' | head -1)" ]; then
+    [ -f ../external/salvador/src/salvador.c ] || { echo "external/salvador is missing: git submodule update --init"; exit 1; }
+    make -s -C ../external/salvador CC="${HOSTCC:-cc}" OBJDIR="$PWD/gen/salvador-obj" APP="$PWD/gen/salvador" >/dev/null || exit 1
+fi
 for V in ":" "-irq:-DIRQXFER"; do
     romcc -Os -m68020 -noixemul -nostdlib -nostartfiles -fno-builtin \
         -fomit-frame-pointer -fno-toplevel-reorder -Wall -Wextra -Wno-pointer-sign -Wno-array-bounds \

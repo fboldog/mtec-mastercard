@@ -1,0 +1,3 @@
+[submodule "external/salvador"]
+	path = external/salvador
+	url = https://github.com/reinauer/salvador

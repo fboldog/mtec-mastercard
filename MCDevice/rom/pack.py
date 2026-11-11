@@ -6,7 +6,8 @@
 DRIVER_HUNK is the driver linked with -DROM_BUILD, an Amiga executable.
 Its hunks are laid out one after another in a single memory block, the
 relocations turned into offsets into that block, and the result, followed by
-the relocation table, compressed (lz.py) and stored byte-wide at image $0300
+the relocation table, compressed (ZX0, with salvador: zx0.py) and stored
+byte-wide at image $0300
 (board $0600). DIAG is the DiagArea: diag.s, assembled here with the blob's
 board offset, or diag.o, already assembled with BLOBX=1536. It is stored
 nibble-wide at image $0040.
@@ -22,7 +23,7 @@ import subprocess
 import sys
 import tempfile
 
-import lz
+import zx0
 
 AS = "/opt/amiga/bin/m68k-amigaos-as"
 NM = "/opt/amiga/bin/m68k-amigaos-nm"
@@ -125,9 +126,9 @@ def blob(path):
     if total > 0xFFFF:
         fail("driver is over 64 KB, too big for 16-bit relocation offsets")
     data = bytes(img) + b"".join(struct.pack(">H", p) for p in sorted(fix))
-    packed = lz.compress(data)
-    if lz.decompress(packed, len(data)) != data:
-        fail("compression does not round-trip")
+    packed = zx0.compress(data)
+    if zx0.decompress(packed) != data:
+        fail("compression does not round-trip through the 68000 decoder")
     # The memory block also holds the relocation table while it is used;
     # DiagPoint clears it after, for the bss.
     mem = (max(total, len(data)) + 3) & ~3

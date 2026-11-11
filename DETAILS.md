@@ -565,19 +565,21 @@ more. `build.sh` compiles the ROM with GCC 16.2 from the
 builds it with the local toolchain. The disk drivers keep everything and the
 local toolchain.
 
-**Compression:** the driver and its relocation table are stored compressed, in
-a small LZ format of our own (`rom/lz.py`): literal runs, copies, and as in
-zx0 a copy from the last offset again right after literals; lengths and
-offsets as interlaced Elias gamma codes, bit groups interleaved with the bytes.
-`pack.py` compresses with an optimal parse over the two states (after a copy,
-after literals) and checks that the result unpacks. The decoder in `diag.s` is
-about 90 bytes and reads the byte-wide ROM directly, so it needs no buffer; the
-relocation table is unpacked into what becomes the bss and cleared as it is
-applied. The driver moved from `$0200` to `$0300` to give the DiagArea room
-(306 of 352 bytes). The copy from the last offset saved about 590 bytes. With
-GCC 16.2 the interrupt ROM now packs 22256 bytes into 15080 and leaves 536
-bytes free; the polled one 678. Before compression the interrupt ROM had 254
-bytes free.
+**Compression:** the driver and its relocation table are stored compressed with
+ZX0 (V2), made by salvador (Emmanuel Marty; [reinauer/salvador](https://github.com/reinauer/salvador)), a
+submodule in `external/salvador` that `build.sh` builds into `gen/`. The
+decoder in `diag.s` is salvador's `unzx0_68000.S` (zlib licence), altered to
+read the byte-wide ROM directly, one board byte in two, so it needs no buffer.
+Like the original, it refills its bit queue only at the stop bit of an Elias
+gamma number; `rom/zx0.py` models it bit for bit, and `pack.py` refuses an image
+that doesn't unpack through that model. The relocation table is unpacked into
+what becomes the bss and cleared as it is applied. The driver moved from
+`$0200` to `$0300` to give the DiagArea room (302 of 352 bytes).
+
+Our own LZ format came first (literal runs, copies, and zx0's copy from the
+last offset); ZX0 with salvador packs about 390 bytes smaller. With GCC 16.2
+the interrupt ROM packs 22256 bytes into 14688 and leaves 928 bytes free; the
+polled one 1067. Before compression the interrupt ROM had 254 bytes free.
 
 ### CD boot
 
