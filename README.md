@@ -99,7 +99,7 @@ The measurements and the tuning behind them are in
 You need the Bebbo `m68k-amigaos-gcc` in `/opt/amiga/bin`, the Amiga NDK 3.2,
 Python 3, a host C compiler, and Docker for the ROM, which is built with GCC
 16.2 from the `stefanreinauer/amiga-gcc:gcc-v16.2` image. The ROM is compressed
-with salvador (ZX0, by Emmanuel Marty; [reinauer/salvador](https://github.com/reinauer/salvador)), a submodule
+with salvador (ZX0, by Emmanuel Marty and Stefan Reinauer; [reinauer/salvador](https://github.com/reinauer/salvador)), a submodule
 that `build.sh` builds.
 
 ```sh
@@ -126,5 +126,5 @@ ROM, FFS, MUI, OS libraries, reference manuals and every `.adf`. See
   [ODFileSystem](https://github.com/reinauer/ODFileSystem/) by Stefan Reinauer
   (BSD-2-Clause), cut down to plain ISO 9660 for booting.
 - **ROM compression:** ZX0 by Einar Saukas, compressed with salvador by Emmanuel
-  Marty, and decoded with salvador's 68000 decoder (zlib licence), in
+  Marty (updated by Stefan Reinauer), and decoded with salvador's 68000 decoder (zlib licence), in
   `external/salvador`.
