@@ -42,7 +42,8 @@ test history and the patched M-Tec ROM, is in [DETAILS.md](DETAILS.md).
   so the boot CD can be taken out and put back. A CD file system in a disk's
   RDB or in Kickstart is used instead when there is one. The ROM's contents
   are compressed to make room. The 3.2 CD boots on the real card from a
-  BlueSCSI's CD image; see [DETAILS.md](DETAILS.md#cd-boot).
+  BlueSCSI's CD image (but also tested with external SCSI CD-ROM and the
+  official Amiga OS 3.2 install CD); see [DETAILS.md](DETAILS.md#cd-boot).
   The CD boot is based on the
   [A4091 software](https://github.com/A4091/a4091-software), and the small ISO
   9660 file system on [ODFileSystem](https://github.com/reinauer/ODFileSystem/).
